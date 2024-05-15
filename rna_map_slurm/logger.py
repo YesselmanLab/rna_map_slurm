@@ -4,7 +4,7 @@ import sys
 APP_LOGGER_NAME = "RNA-MAP-SLURM"
 
 
-def setup_logging():
+def setup_logging(is_debug=False, file_name=None):
     """
     setup logging for everything.
     """
@@ -19,6 +19,11 @@ def setup_logging():
     )
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
+
+    if file_name:
+        fh = logging.FileHandler(file_name)
+        fh.setFormatter(formatter)
+        root_logger.addHandler(fh)
 
 
 def setup_applevel_logger(logger_name=APP_LOGGER_NAME, is_debug=True, file_name=None):
