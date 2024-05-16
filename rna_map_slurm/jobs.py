@@ -1,5 +1,41 @@
 import subprocess
 import json
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, order=True)
+class SlurmOptions:
+    name: str
+    time: str = "12:00:00"
+    mem_per_job: str = "2GB"
+    cpus_per_task: int = 1
+    extra_header_lines: str = ""
+
+
+def generate_submit_file(path, jobs):
+    f = open(path, "w")
+    for j in jobs:
+        f.write(f"sbatch {j[0]}\n")
+    f.close()
+
+
+def get_job_header(args: SlurmOptions, job_dir=None):
+    if job_dir is not None:
+        output_path = f"{job_dir}/{args.name}.out"
+        error_path = f"{job_dir}/{args.name}.err"
+    else:
+        output_path = f"{args.name}.out"
+        error_path = f"{args.name}.err"
+
+    return f"""#!/bin/bash
+#SBATCH --time={args.time}         
+#SBATCH --mem-per-cpu={args.mem_per_job}       
+#SBATCH --cpus-per-task={args.cpus_per_task}    
+#SBATCH --output={output_path}
+#SBATCH --error={error_path}
+
+{args.extra_header_lines}
+"""
 
 
 def get_user_jobs(user):

@@ -1,0 +1,4 @@
+run_name,exp_name,construct,code,length,barcode,barcode_seq,data_type,buffer,buffer_conc,mg_conc,exp_type
+2023_01_11_mtt6_uucg_2_seq,2022_12_16_C0098_50mM_NaC_Mg_titra_CM,mtt6_mutations_set_1_uucg_50mM-NaC_10mM-Mg2+,C0098,300.0,RTB004,TGCGCCATTGCT,DMS,NaCoc,50.0,10.0,mg_titration
+2023_01_11_mtt6_uucg_2_seq,2022_12_16_C0098_50mM_NaC_Mg_titra_CM,mtt6_mutations_set_1_uucg_50mM-NaC_7.5mM-Mg2+,C0098,300.0,RTB005,ACAAAATGGTGG,DMS,NaCoc,50.0,7.5,mg_titration
+2023_01_11_mtt6_uucg_2_seq,2022_12_16_C0098_50mM_NaC_Mg_titra_CM,mtt6_mutations_set_1_uucg_50mM-NaC_6.5mM-Mg2+,C0098,300.0,RTB006,CTGCGTGCAAAC,DMS,NaCoc,50.0,6.5,mg_titration

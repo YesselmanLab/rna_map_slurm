@@ -1,0 +1,6 @@
+2024-05-16 15:02:44,362 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - data.csv has 98 constructs
+2024-05-16 15:02:44,362 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up run
+2024-05-16 15:02:44,362 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Reading param file: test.yml
+2024-05-16 15:02:44,362 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up directories
+2024-05-16 15:02:44,362 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Creating directories: jobs, submits, data, inputs
+2024-05-16 15:02:44,363 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - setting seq_path from environment variable: /Users/jyesselman2/gdrive/sequences_and_oligos

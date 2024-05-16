@@ -1,11 +1,16 @@
 import click
+import os
 import pandas as pd
-from fastqsplitter import split_fastqs as fastqsplitter
+import numpy as np
+import shutil
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
+from barcode_demultiplex.demultiplex import find_helix_barcodes
+
 from rna_map_slurm.fastq import get_paired_fastqs
 from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logger
+from rna_map_slurm.parameters import get_parameters_from_file
 
 
 log = get_logger(__name__)
@@ -40,7 +45,7 @@ def format_sequencing_run_info(df: pd.DataFrame):
         df (pandas.DataFrame): The input DataFrame containing the sequencing run information.
 
     Returns:
-        None
+        pandas.DataFrame: The formatted DataFrame containing the sequencing run information.
     """
     if len(df) == 0:
         log.error("No sequencing run information found")
@@ -56,6 +61,7 @@ def format_sequencing_run_info(df: pd.DataFrame):
         if len(seq) == 0:
             if not row["exp_name"].lower().startswith("eich"):
                 log.warning(f"No sequence information found for {row['code']}")
+            demult_cmds.append(None)
             continue
         seq = seq.iloc[0]
         demult_cmds.append(seq["demultiplex"])
@@ -63,6 +69,31 @@ def format_sequencing_run_info(df: pd.DataFrame):
             log.info(
                 f"Found a demultiplexing command for {row['construct']}: {seq['demultiplex']}"
             )
+    df["demult_cmd"] = demult_cmds
+    return df
+
+
+def get_seq_path(params) -> str:
+    """
+    Gets the path where sequence information is stored. First check the environ
+    variable SEQPATH is that is not set check the params file params["paths"]["seq_path"]
+
+    Args:
+        params (dict): The parameters dictionary.
+
+    Returns:
+        str: The path where sequence information is stored.
+    """
+    seq_path = ""
+    try:
+        seq_path = os.environ["SEQPATH"]
+        log.info(f"setting seq_path from environment variable: {seq_path}")
+    except:
+        log.info("SEQPATH not set")
+    if seq_path == "":
+        seq_path = params["paths"]["seq_path"]
+        log.info(f"setting seq_path from params file: {seq_path}")
+    return seq_path
 
 
 @click.group()
@@ -70,38 +101,64 @@ def cli():
     pass
 
 
-# TODO add schema valiadation of params!
-# TODO compute a way to figure out the optimial number of chunks to split into
-# TODO hide job output when its working!
 @cli.command()
 @click.argument("run_name")
-@click.argument("input_file", type=click.Path(exists=True))
-def setup(run_name, input_file):
-    setup_logging(file_name="rna_map_slurm.log")
-    log.info(f"Setting up run: {run_name}")
-    log.info(f"Reading input file: {input_file}")
-    # df = get_sequence_run_info_sheet()
-    # df = df[df["run_name"] == run_name]
-    # df.to_csv("data.csv", index=False)
-    df = pd.read_csv("data.csv")
+def get_data_csv(run_name):
+    setup_logging(file_name="get_data_csv.log")
+    df = get_sequence_run_info_sheet()
+    # setup data.csv file ##########################################
+    df = get_sequence_run_info_sheet()
+    df = df[df["run_name"] == run_name]
     df = format_sequencing_run_info(df)
+    df.to_csv("data.csv", index=False)
 
 
 @cli.command()
-@click.argument("r1_path", type=click.Path(exists=True))
-@click.argument("r2_path", type=click.Path(exists=True))
-@click.argument("output_dir", type=click.Path(exists=True))
-@click.argument("num_chunks", type=int)
-@click.option("--start", default=0)
-@click.option("--threads", default=1)
-def split_fastqs(r1_path, r2_path, output_dir, num_chunks, start, threads):
-    r1_output_files = []
-    r2_output_files = []
-    for i in range(start, num_chunks + start):
-        r1_output_files.append(f"{output_dir}/split-{i:04}/test_R1.fastq.gz")
-        r2_output_files.append(f"{output_dir}/split-{i:04}/test_R2.fastq.gz")
-    fastqsplitter(r1_path, r1_output_files, threads_per_file=threads)
-    fastqsplitter(r2_path, r2_output_files, threads_per_file=threads)
+@click.argument("data_csv")
+@click.argument("data_dir")
+@click.option("--param-file", type=click.Path(exists=True), default=None)
+def setup(data_csv, data_dir, param_file):
+    setup_logging(file_name="setup.log")
+    df = pd.read_csv(data_csv)
+    params = get_parameters_from_file(param_file)
+    log.info(f"data.csv has {len(df)} constructs")
+    log.info("Setting up run")
+    log.info(f"Reading param file: {param_file}")
+    # setup directories ###########################################
+    log.info("Setting up directories")
+    log.info("Creating directories: jobs, submits, data, inputs")
+    os.makedirs("jobs", exist_ok=True)
+    os.makedirs("submits", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("inputs", exist_ok=True)
+    # setup input directories ######################################
+    os.makedirs("inputs/barcode_jsons", exist_ok=True)
+    os.makedirs("inputs/fastas", exist_ok=True)
+    os.makedirs("inputs/rnas", exist_ok=True)
+    # setup input files ############################################
+    seq_path = get_seq_path(params)
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    for i, row in df.iterrows():
+        if row["exp_name"].lower().startswith("eich"):
+            continue
+        if not os.path.isfile(f"{seq_path}/rna/{row['code']}.csv"):
+            log.warning(f"{row['code']} does not have a RNA CSV file!!!")
+            continue
+        df_seq = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
+        shutil.copy(f"{seq_path}/fastas/{row['code']}.fasta", "inputs/fastas/")
+        df_seq.to_csv(f"inputs/rnas/{row['code']}.csv", index=False)
+        helices = []
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        args = row["demult_cmd"].split()
+        for i in range(0, len(args)):
+            if args[i] == "--helix" or args[i] == "-helix":
+                helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
+        df_barcodes = find_helix_barcodes(df_seq, helices)
+        df_barcodes.to_json(
+            f"inputs/barcode_jsons/{row['code']}.json", orient="records"
+        )
 
 
 if __name__ == "__main__":
