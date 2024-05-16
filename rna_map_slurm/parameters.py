@@ -43,6 +43,19 @@ def fill_in_missing_default_params(config_data):
     return config_data
 
 
+def get_default_parameters():
+    """
+    Get the default parameters from the default YAML file.
+
+    Returns:
+    - dict: The dictionary containing the default parameters.
+    """
+    path = get_lib_path() + "/rna_map_slurm/resources/default.yml"
+    with open(path, "r") as yaml_file:
+        default_data = yaml.safe_load(yaml_file)
+    return default_data
+
+
 def get_parameters_from_file(file_path):
     """
     Get parameters from a YAML file and fills in missing default values

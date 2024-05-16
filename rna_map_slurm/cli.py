@@ -10,7 +10,7 @@ from barcode_demultiplex.demultiplex import find_helix_barcodes
 
 from rna_map_slurm.fastq import get_paired_fastqs
 from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logger
-from rna_map_slurm.parameters import get_parameters_from_file
+from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
 
 
 log = get_logger(__name__)
@@ -120,10 +120,14 @@ def get_data_csv(run_name):
 def setup(data_csv, data_dir, param_file):
     setup_logging(file_name="setup.log")
     df = pd.read_csv(data_csv)
-    params = get_parameters_from_file(param_file)
+    if param_file is None:
+        log.info(f"Reading param file: {param_file}")
+        params = get_parameters_from_file("params.json")
+    else:
+        log.info("Using default parameters")
+        params = get_default_parameters()
     log.info(f"data.csv has {len(df)} constructs")
     log.info("Setting up run")
-    log.info(f"Reading param file: {param_file}")
     # setup directories ###########################################
     log.info("Setting up directories")
     log.info("Creating directories: jobs, submits, data, inputs")
