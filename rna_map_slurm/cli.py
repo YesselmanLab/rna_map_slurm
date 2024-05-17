@@ -12,7 +12,10 @@ from barcode_demultiplex.demultiplex import find_helix_barcodes
 from rna_map_slurm.fastq import get_paired_fastqs
 from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logger
 from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
-from rna_map_slurm.generate_job import generate_split_fastq_jobs
+from rna_map_slurm.generate_job import (
+    generate_split_fastq_jobs,
+    generate_demultiplexing_jobs,
+)
 
 log = get_logger(__name__)
 
@@ -178,7 +181,10 @@ def setup(data_csv, data_dirs, param_file):
         os.makedirs(f"data/split-{i:04}", exist_ok=True)
     # generate all jobs
     df_jobs = []
-    df_jobs.extend(generate_split_fastq_jobs(all_pfqs, params))
+    df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
+    df_jobs.append(generate_demultiplexing_jobs(params, num_dirs))
+    df_job = pd.concat(df_jobs)
+    df_job.to_csv("jobs.csv", index=False)
 
 
 if __name__ == "__main__":

@@ -41,3 +41,44 @@ def generate_split_fastq_jobs(
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job"].tolist())
     return df_jobs
+
+
+def generate_demultiplexing_jobs(params, num_dirs):
+    os.makedirs("jobs/demultiplex", exist_ok=True)
+    cur_dir = os.path.abspath(os.getcwd())
+    csv_path = os.path.abspath("data.csv")
+    runs_per_job = params["tasks_per_job"]["demultiplex"]
+    dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
+    slurm_params = params["slurm_options"]["demultiplex"]
+    dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
+    jobs = []
+    for i, dg in enumerate(dir_groups):
+        name = f"demultiplex-{i:04}"
+        slurm_opts = SlurmOptions(
+            name,
+            slurm_params["time"],
+            slurm_params["mem-per-cpu"],
+            slurm_params["cpus-per-task"],
+            params["slurm_options"]["extra_header_cmds"],
+        )
+        job_header = get_job_header(slurm_opts, os.path.abspath("jobs/demultiplex/"))
+        job_body = ""
+        for d in dg:
+            job_body += (
+                f"cd {cur_dir}/{d}\n"
+                f"rna-map-slurm-runner demultiplex {csv_path} test_R1.fastq.gz test_R2.fastq.gz\n"
+            )
+        job = job_header + job_body
+        f = open(f"jobs/demultiplex/{name}.sh", "w")
+        f.write(job)
+        f.close()
+        jobs.append(
+            [
+                f"jobs/demultiplex/demultiplex-{i:04}.sh",
+                "DEMULTIPLEXING",
+                "FASTQ_SPLITTING",
+            ]
+        )
+    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    generate_submit_file("submits/README_DEMULTIPLEXING", df_jobs["job"].tolist())
+    return df_jobs

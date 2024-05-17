@@ -48,6 +48,7 @@ log = get_logger("MAIN")
 # UTILS ##############################################################################
 
 
+# CONVERTED
 @dataclass(frozen=True, order=True)
 class FastqFile:
     """
@@ -93,6 +94,7 @@ class FastqFile:
         return False
 
 
+# CONVERTED
 @dataclass(frozen=True, order=True)
 class PairedFastqFiles:
     """
@@ -111,6 +113,7 @@ class PairedFastqFiles:
         return False
 
 
+# CONVERTED
 def get_paired_fastqs(dir_path: str) -> PairedFastqFiles:
     """
     Get the paired fastq files from a directory
@@ -144,6 +147,7 @@ def check_if_columns_exist(df: pd.DataFrame, cols) -> None:
             )
 
 
+# CONVERTED
 def gzip_files(directory):
     for root, dirs, files in os.walk(directory):
         for file in files:
@@ -157,6 +161,7 @@ def gzip_files(directory):
                 os.remove(file_path)  # Remove the original file
 
 
+# CONVERTED
 def random_string(length):
     return "".join(random.choices(string.ascii_letters, k=length))
 
@@ -207,6 +212,7 @@ def get_file_size(file_path):
 # DEMULTIPLEXING ####################################################################
 
 
+# CONVERTED
 class SabreDemultiplexer(object):
     def setup(self, params) -> None:
         """
@@ -280,6 +286,7 @@ class SabreDemultiplexer(object):
 # SLURM JOBS ########################################################################
 
 
+# CONVERTED
 @dataclass(frozen=True, order=True)
 class JobArguments:
     time: str = "12:00:00"
@@ -287,6 +294,7 @@ class JobArguments:
     cpus_per_task: int = 1
 
 
+# CONVERTED
 def get_job_header(args: JobArguments):
     return f"""#!/bin/bash
 #SBATCH --time={args.time}          # Run time in hh:mm:ss
@@ -316,6 +324,7 @@ def get_num_of_active_jobs(cmd):
     return count - 1
 
 
+# CONVERTED
 def generate_submit_file(path, jobs):
     f = open(path, "w")
     for j in jobs:
@@ -326,6 +335,7 @@ def generate_submit_file(path, jobs):
 # JOB GENERATION ####################################################################
 
 
+# CONVERTED
 def generate_fastq_spliting_jobs(params):
     os.makedirs("jobs/fastq_spliting", exist_ok=True)
     dirs = params["fastq_dirs"].split(",")
@@ -630,9 +640,7 @@ def test():
     validate_fasta_file("test.fa")
 
 
-# TODO add schema valiadation of params!
-# TODO compute a way to figure out the optimial number of chunks to split into
-# TODO hide job output when its working!
+# CONVERTED
 @cli.command()
 @click.argument("input_file", type=click.Path(exists=True))
 def setup(input_file):
@@ -692,6 +700,8 @@ def status(input_file):
 
 # split fastqs #######################################################################
 
+# CONVERTED
+
 
 @cli.command()
 @click.argument("r1_path", type=click.Path(exists=True))
@@ -715,6 +725,8 @@ def split_fastqs(r1_path, r2_path, output_dir, num_chunks, start, debug):
 
 
 # demultiplex #######################################################################
+
+# CONVERTED
 
 
 @cli.command()
