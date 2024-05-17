@@ -92,6 +92,7 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
 @click.argument("barcode_seq")
 @click.argument("rna_name")
 def combine_rna_map(barcode_seq, rna_name):
+    setup_logging()
     df = pd.read_csv("data.csv")
     df_sub = df[df["barcode_seq"] == barcode_seq]
     if len(df_sub) == 0:
@@ -102,21 +103,24 @@ def combine_rna_map(barcode_seq, rna_name):
     run_path = "results/" + row["run_name"]
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
+    log.info(f"results path: {final_path}")
     os.makedirs(run_path, exist_ok=True)
     os.makedirs(run_path, exist_ok=True)
     os.makedirs(final_path, exist_ok=True)
     dirs = glob.glob("data/split-*")
     merged_mut_histos = None
+    count_files = 0
     for d in dirs:
         mhs_path = (
             f"{d}/{barcode_seq}/{rna_name}/output/BitVector_Files/mutation_histos.p"
         )
         if not os.path.isfile(mhs_path):
-            print(mhs_path)
+            log.warning("files not found:" + mhs_path)
             continue
         if merged_mut_histos is None:
             try:
                 merged_mut_histos = get_mut_histos_from_pickle_file(mhs_path)
+                count_files += 1
             except:
                 log.warning(f"could not open file: {mhs_path}")
         else:
@@ -124,8 +128,10 @@ def combine_rna_map(barcode_seq, rna_name):
                 merge_mut_histo_dicts(
                     merged_mut_histos, get_mut_histos_from_pickle_file(mhs_path)
                 )
+                count_files += 1
             except:
                 log.warning(f"could not open file: {mhs_path}")
+    log.info(f"merged {count_files} files")
     cols = [
         "name",
         "sequence",
