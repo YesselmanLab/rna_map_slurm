@@ -16,6 +16,7 @@ from rna_map_slurm.generate_job import (
     generate_split_fastq_jobs,
     generate_demultiplexing_jobs,
     generate_rna_map_jobs,
+    generate_rna_map_combine_jobs,
 )
 
 log = get_logger(__name__)
@@ -185,6 +186,7 @@ def setup(data_csv, data_dirs, param_file):
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
     df_jobs.append(generate_demultiplexing_jobs(params, num_dirs))
     df_jobs.append(generate_rna_map_jobs(params, num_dirs))
+    df_jobs.append(generate_rna_map_combine_jobs(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 

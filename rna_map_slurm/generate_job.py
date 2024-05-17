@@ -120,9 +120,7 @@ def generate_rna_map_jobs(params, num_dirs):
                 slurm_params["cpus-per-task"],
                 params["slurm_options"]["extra_header_cmds"],
             )
-            job_header = get_job_header(
-                slurm_opts, os.path.abspath("jobs/demultiplex/")
-            )
+            job_header = get_job_header(slurm_opts, os.path.abspath("jobs/rna-map/"))
             job_body = ""
             for dir in dg:
                 os.makedirs(
@@ -145,4 +143,44 @@ def generate_rna_map_jobs(params, num_dirs):
             count += 1
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_RNA_MAP", df_jobs["job"].tolist())
+    return df_jobs
+
+
+def generate_rna_map_combine_jobs(params):
+    os.makedirs("jobs/rna-map-combine", exist_ok=True)
+    df = pd.read_csv("data.csv")
+    slurm_params = params["slurm_options"]["rna_map_combine"]
+    jobs = []
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    for i, row in df.iterrows():
+        name = f"rna-map-combine-{i:04}"
+        slurm_opts = SlurmOptions(
+            name,
+            slurm_params["time"],
+            slurm_params["mem-per-cpu"],
+            slurm_params["cpus-per-task"],
+            params["slurm_options"]["extra_header_cmds"],
+        )
+        job_header = get_job_header(
+            slurm_opts, os.path.abspath("jobs/rna-map-combine/")
+        )
+        if not pd.isnull(row["demult_cmd"]):
+            continue
+        if row["exp_name"].lower().startswith("eich"):
+            continue
+        job_body = f"rna-map-slurm-runner combine-rna-map {row['barcode_seq']} {row['construct']}\n"
+        job = job_header + job_body
+        f = open(f"jobs/rna-map-combine/{name}.sh", "w")
+        f.write(job)
+        f.close()
+        jobs.append(
+            [
+                f"jobs/rna-map-combine/{name}.sh",
+                "RNA_MAP_COMBINE",
+                "RNA_MAP",
+            ]
+        )
+    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    generate_submit_file("submits/README_RNA_MAP_COMBINE", df_jobs["job"].tolist())
     return df_jobs
