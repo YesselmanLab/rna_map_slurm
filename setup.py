@@ -33,7 +33,18 @@ setup(
         "rna_map_slurm",
     ],
     package_dir={"rna_map_slurm": "rna_map_slurm"},
-    py_modules=["rna_map_slurm/cli"],
+    py_modules=[
+        "rna_map_slurm/cli",
+        "rna_map_slurm/demultiplex",
+        "rna_map_slurm/fastq",
+        "rna_map_slurm/generate_job",
+        "rna_map_slurm/jobs",
+        "rna_map_slurm/logger",
+        "rna_map_slurm/parameters",
+        "rna_map_slurm/paths",
+        "rna_map_slurm/run",
+        "rna_map_slurm/util",
+    ],
     include_package_data=True,
     install_requires=requirements,
     zip_safe=False,
@@ -44,5 +55,10 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: Implementation :: PyPy",
     ],
-    entry_points={"console_scripts": ["rna-map-slurm = rna_map_slurm.cli:cli"]},
+    entry_points={
+        "console_scripts": [
+            "rna-map-slurm = rna_map_slurm.cli:cli",
+            "rna-map-slurm-runner = rna_map_slurm.run:cli",
+        ]
+    },
 )

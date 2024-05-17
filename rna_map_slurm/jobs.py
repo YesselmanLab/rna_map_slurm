@@ -9,13 +9,13 @@ class SlurmOptions:
     time: str = "12:00:00"
     mem_per_job: str = "2GB"
     cpus_per_task: int = 1
-    extra_header_lines: str = ""
+    extra_header_cmds: str = ""
 
 
 def generate_submit_file(path, jobs):
     f = open(path, "w")
     for j in jobs:
-        f.write(f"sbatch {j[0]}\n")
+        f.write(f"sbatch {j}\n")
     f.close()
 
 
@@ -34,7 +34,7 @@ def get_job_header(args: SlurmOptions, job_dir=None):
 #SBATCH --output={output_path}
 #SBATCH --error={error_path}
 
-{args.extra_header_lines}
+{args.extra_header_cmds}
 """
 
 

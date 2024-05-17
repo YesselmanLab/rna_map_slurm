@@ -11,6 +11,7 @@ tasks_per_job:
   rna_map_single_barcode: 2
   rna_map_single_barcode_combine: 1
 slurm_options:
+  extra_header_cmds: "" 
   # used if nothing else is specified
   default:
     time: "12:00:00"

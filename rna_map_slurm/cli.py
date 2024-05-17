@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import shutil
+import json
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -11,7 +12,7 @@ from barcode_demultiplex.demultiplex import find_helix_barcodes
 from rna_map_slurm.fastq import get_paired_fastqs
 from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logger
 from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
-
+from rna_map_slurm.generate_job import generate_split_fastq_jobs
 
 log = get_logger(__name__)
 
@@ -115,17 +116,18 @@ def get_data_csv(run_name):
 
 @cli.command()
 @click.argument("data_csv")
-@click.argument("data_dir")
+@click.argument("data_dirs", nargs=-1)
 @click.option("--param-file", type=click.Path(exists=True), default=None)
-def setup(data_csv, data_dir, param_file):
+def setup(data_csv, data_dirs, param_file):
     setup_logging(file_name="setup.log")
     df = pd.read_csv(data_csv)
-    if param_file is None:
+    if param_file is not None:
         log.info(f"Reading param file: {param_file}")
-        params = get_parameters_from_file("params.json")
+        params = get_parameters_from_file(param_file)
     else:
         log.info("Using default parameters")
         params = get_default_parameters()
+    log.info("\n" + json.dumps(params, indent=4))
     log.info(f"data.csv has {len(df)} constructs")
     log.info("Setting up run")
     # setup directories ###########################################
@@ -143,6 +145,7 @@ def setup(data_csv, data_dir, param_file):
     seq_path = get_seq_path(params)
     if "demult_cmd" not in df.columns:
         df["demult_cmd"] = np.nan
+    # generate data dirs ###########################################
     for i, row in df.iterrows():
         if row["exp_name"].lower().startswith("eich"):
             continue
@@ -163,6 +166,17 @@ def setup(data_csv, data_dir, param_file):
         df_barcodes.to_json(
             f"inputs/barcode_jsons/{row['code']}.json", orient="records"
         )
+    all_pfqs = []
+    for d in data_dirs:
+        d = os.path.abspath(d)
+        all_pfqs.extend(get_paired_fastqs(d))
+    num_dirs = params["fastq_chunks"] * len(all_pfqs)
+    params["num_dirs"] = num_dirs
+    for i in range(0, num_dirs):
+        os.makedirs(f"data/split-{i:04}", exist_ok=True)
+    # generate all jobs
+    df_jobs = []
+    df_jobs.extend(generate_split_fastq_jobs(all_pfqs, params))
 
 
 if __name__ == "__main__":

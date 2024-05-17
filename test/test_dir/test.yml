@@ -1,1 +1,3 @@
 fastq_chunks: 2
+slurm_options:
+  extra_header_cmds: "module load bowtie/2.3 trim_galore fastqc anaconda\nconda activate\nconda activate rna-map-nextflow" 

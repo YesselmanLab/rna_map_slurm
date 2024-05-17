@@ -1,6 +1,9 @@
 import yaml
 
 from rna_map_slurm.paths import get_lib_path
+from rna_map_slurm.logger import get_logger
+
+log = get_logger(__name__)
 
 
 def fill_in_missing_default_dict_values(default, current):
