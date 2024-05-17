@@ -943,3 +943,240 @@
 2024-05-16 22:47:52,260 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up directories
 2024-05-16 22:47:52,260 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Creating directories: jobs, submits, data, inputs
 2024-05-16 22:47:52,260 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - setting seq_path from environment variable: /Users/jyesselman2/gdrive/sequences_and_oligos
+2024-05-17 10:14:22,589 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Reading param file: test.yml
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - 
+{
+    "fastq_chunks": 2,
+    "slurm_options": {
+        "extra_header_cmds": "module load bowtie/2.3 trim_galore fastqc anaconda\nconda activate\nconda activate rna-map-nextflow",
+        "default": {
+            "time": "12:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "split_fastq": {
+            "time": "04:00:00",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "64GB"
+        },
+        "demultiplex": {
+            "time": "04:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "internal_demultiplex": {
+            "time": "48:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "join_internal_demultiplex": {
+            "time": "24:00:00\"",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "16GB"
+        },
+        "join_fastq": {
+            "time": "24:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map": {
+            "time": "6:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        }
+    },
+    "tasks_per_job": {
+        "default": 1,
+        "split_fastq": 1,
+        "demultiplex": 10,
+        "internal_demultiplex": 1,
+        "join_internal_demultiplex": 1,
+        "join_fastq": 1,
+        "rna_map": 25,
+        "rna_map_combine": 1,
+        "rna_map_single_barcode": 2,
+        "rna_map_single_barcode_combine": 1
+    },
+    "paths": {
+        "tmp_dir": "/scratch/",
+        "seq_path": null
+    }
+}
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - data.csv has 98 constructs
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up run
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up directories
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Creating directories: jobs, submits, data, inputs
+2024-05-17 10:14:22,592 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - setting seq_path from environment variable: /Users/jyesselman2/gdrive/sequences_and_oligos
+2024-05-17 10:15:21,116 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Reading param file: test.yml
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - 
+{
+    "fastq_chunks": 2,
+    "slurm_options": {
+        "extra_header_cmds": "module load bowtie/2.3 trim_galore fastqc anaconda\nconda activate\nconda activate rna-map-nextflow",
+        "default": {
+            "time": "12:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "split_fastq": {
+            "time": "04:00:00",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "64GB"
+        },
+        "demultiplex": {
+            "time": "04:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "internal_demultiplex": {
+            "time": "48:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "join_internal_demultiplex": {
+            "time": "24:00:00\"",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "16GB"
+        },
+        "join_fastq": {
+            "time": "24:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map": {
+            "time": "6:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        }
+    },
+    "tasks_per_job": {
+        "default": 1,
+        "split_fastq": 1,
+        "demultiplex": 10,
+        "internal_demultiplex": 1,
+        "join_internal_demultiplex": 1,
+        "join_fastq": 1,
+        "rna_map": 25,
+        "rna_map_combine": 1,
+        "rna_map_single_barcode": 2,
+        "rna_map_single_barcode_combine": 1
+    },
+    "paths": {
+        "tmp_dir": "/scratch/",
+        "seq_path": null
+    }
+}
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - data.csv has 98 constructs
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up run
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up directories
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Creating directories: jobs, submits, data, inputs
+2024-05-17 10:15:21,119 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - setting seq_path from environment variable: /Users/jyesselman2/gdrive/sequences_and_oligos
+2024-05-17 10:15:37,507 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Reading param file: test.yml
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - 
+{
+    "fastq_chunks": 2,
+    "slurm_options": {
+        "extra_header_cmds": "module load bowtie/2.3 trim_galore fastqc anaconda\nconda activate\nconda activate rna-map-nextflow",
+        "default": {
+            "time": "12:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "split_fastq": {
+            "time": "04:00:00",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "64GB"
+        },
+        "demultiplex": {
+            "time": "04:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "internal_demultiplex": {
+            "time": "48:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "join_internal_demultiplex": {
+            "time": "24:00:00\"",
+            "cpus-per-task": 8,
+            "mem-per-cpu": "16GB"
+        },
+        "join_fastq": {
+            "time": "24:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map": {
+            "time": "6:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        },
+        "rna_map_single_barcode_combine": {
+            "time": "2:00:00",
+            "cpus-per-task": 1,
+            "mem-per-cpu": "2GB"
+        }
+    },
+    "tasks_per_job": {
+        "default": 1,
+        "split_fastq": 1,
+        "demultiplex": 10,
+        "internal_demultiplex": 1,
+        "join_internal_demultiplex": 1,
+        "join_fastq": 1,
+        "rna_map": 25,
+        "rna_map_combine": 1,
+        "rna_map_single_barcode": 2,
+        "rna_map_single_barcode_combine": 1
+    },
+    "paths": {
+        "tmp_dir": "/scratch/",
+        "seq_path": null
+    }
+}
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - data.csv has 98 constructs
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up run
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Setting up directories
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - Creating directories: jobs, submits, data, inputs
+2024-05-17 10:15:37,510 - RNA-MAP-SLURM.rna_map_slurm.cli - INFO - setting seq_path from environment variable: /Users/jyesselman2/gdrive/sequences_and_oligos

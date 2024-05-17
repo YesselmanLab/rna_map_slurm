@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 from typing import List, Dict
 
 from rna_map_slurm.logger import get_logger
@@ -81,4 +82,67 @@ def generate_demultiplexing_jobs(params, num_dirs):
         )
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_DEMULTIPLEXING", df_jobs["job"].tolist())
+    return df_jobs
+
+
+def generate_rna_map_jobs(params, num_dirs):
+    """
+    These are jobs that do not do the additional internal demultiplexing required
+    of some large libraries
+    """
+    os.makedirs("jobs/rna-map", exist_ok=True)
+    cur_dir = os.path.abspath(os.getcwd())
+    csv_path = os.path.abspath("data.csv")
+    df = pd.read_csv(csv_path)
+    runs_per_job = params["tasks_per_job"]["rna_map"]
+    slurm_params = params["slurm_options"]["rna_map"]
+    dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
+    dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
+    count = 0
+    jobs = []
+    # should not be necessary anymore but worth leaving
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    for _, row in df.iterrows():
+        if not pd.isnull(row["demult_cmd"]):
+            continue
+        if row["exp_name"].lower().startswith("eich"):
+            continue
+        if not os.path.isfile(f"inputs/fastas/{row['code']}.fasta"):
+            log.warning(f"{row['code']} does not have a RNA CSV file!!!")
+            continue
+        for dg in dir_groups:
+            name = f"rna-map-{count:04}"
+            slurm_opts = SlurmOptions(
+                name,
+                slurm_params["time"],
+                slurm_params["mem-per-cpu"],
+                slurm_params["cpus-per-task"],
+                params["slurm_options"]["extra_header_cmds"],
+            )
+            job_header = get_job_header(
+                slurm_opts, os.path.abspath("jobs/demultiplex/")
+            )
+            job_body = ""
+            for dir in dg:
+                os.makedirs(
+                    f"{cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}",
+                    exist_ok=True,
+                )
+                job_body += (
+                    f"cd {cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}\n"
+                    f"rna-map -fa {cur_dir}/inputs/fastas/{row['code']}.fasta "
+                    f"-fq1 ../test_R1.fastq.gz -fq2 ../test_R2.fastq.gz "
+                    f"--dot-bracket {cur_dir}/inputs/rnas/{row['code']}.csv "
+                    f"--summary-output-only --param-preset barcoded-library\n"
+                    f"rm -rf log input output/Mapping_Files\n"
+                )
+            job = job_header + job_body
+            f = open(f"jobs/rna-map/{name}.sh", "w")
+            f.write(job)
+            f.close()
+            jobs.append([f"jobs/rna-map/{name}.sh", "RNA_MAP", "DEMULTIPLEXING"])
+            count += 1
+    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    generate_submit_file("submits/README_RNA_MAP", df_jobs["job"].tolist())
     return df_jobs

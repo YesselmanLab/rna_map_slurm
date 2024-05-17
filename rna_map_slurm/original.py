@@ -366,6 +366,7 @@ def generate_fastq_spliting_jobs(params):
     return jobs
 
 
+# CONVERTED
 def generate_demultiplexing_jobs(params):
     os.makedirs("jobs/demultiplex", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
