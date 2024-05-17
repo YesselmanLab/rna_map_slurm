@@ -29,12 +29,14 @@ def replace_spaces_warn(df, column_name):
     Returns:
     pd.DataFrame: The DataFrame with spaces replaced by underscores in the specified column.
     """
-    for index, value in df[column_name].iteritems():
+    index = 0
+    for value in df[column_name]:
         if " " in str(value):
             log.warning(
                 f"Replacing spaces with underscores in row {index} for column '{column_name}'. Original value: '{value}'"
             )
             df.at[index, column_name] = value.replace(" ", "_")
+        index += 1
     return df
 
 
