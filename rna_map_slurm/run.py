@@ -2,6 +2,7 @@ import os
 import glob
 import click
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
@@ -9,11 +10,13 @@ from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
     get_mut_histos_from_pickle_file,
     write_mut_histos_to_pickle_file,
+    get_dataframe,
 )
 
 from rna_map_slurm.logger import setup_logging, get_logger
 from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
 from rna_map_slurm.demultiplex import SabreDemultiplexer
+from rna_map_slurm.plotting import plot_pop_avg_from_row
 import click
 
 log = get_logger(__name__)
@@ -123,6 +126,31 @@ def combine_rna_map(barcode_seq, rna_name):
                 )
             except:
                 log.warning(f"could not open file: {mhs_path}")
+    cols = [
+        "name",
+        "sequence",
+        "structure",
+        "pop_avg",
+        "sn",
+        "num_reads",
+        "num_aligned",
+        "no_mut",
+        "1_mut",
+        "2_mut",
+        "3_mut",
+        "3plus_mut",
+    ]
+    df_results = get_dataframe(merged_mut_histos, cols)
+    df_results.rename(columns={"pop_avg": "data"}, inplace=True)
+    df_results.to_json(final_path + "mutation_histos.json", orient="records")
+    i = 0
+    for _, row in df_results.iterrows():
+        plot_pop_avg_from_row(row)
+        plt.savefig(final_path + f"{row['name']}.png")
+        plt.close()
+        i += 1
+        if i > 100:
+            break
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
