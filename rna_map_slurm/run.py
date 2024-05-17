@@ -27,6 +27,11 @@ def cli():
     pass
 
 
+################################################################################
+############################ Use everytime function ############################
+################################################################################
+
+
 @cli.command()
 @click.argument("r1_path", type=click.Path(exists=True), required=True)
 @click.argument("r2_path", type=click.Path(exists=True), required=True)
@@ -158,6 +163,47 @@ def combine_rna_map(barcode_seq, rna_name):
         if i > 100:
             break
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
+
+
+################################################################################
+############################ With internal barcodes ############################
+################################################################################
+
+
+################################################################################
+############################## Summary functions ###############################
+################################################################################
+
+
+# TODO needs be refactored to grab data from that transfered in and doesnt do its own copying
+@cli.command()
+@click.option("--combine-all", is_flag=True)
+def fastq_concat(combine_all):
+    os.makedirs(f"demultiplexed", exist_ok=True)
+    df = pd.read_csv("data.csv")
+    seq_path = os.environ["SEQPATH"]
+    for barcode, g in df.groupby("barcode_seq"):
+        rna_count = 0
+        for row in g.iterrows():
+            try:
+                df_rna = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
+                if len(df_rna) < 1000 and not combine_all:
+                    rna_count += 1
+            except:
+                rna_count += 1
+                continue
+        if rna_count == 0:
+            continue
+        log.info(f"in {barcode} {rna_count} rnas are  present")
+        os.makedirs(f"demultiplexed/{barcode}", exist_ok=True)
+        r1_files = glob.glob(f"data/*/{barcode}/test_R1.fastq.gz")
+        r2_files = glob.glob(f"data/*/{barcode}/test_R2.fastq.gz")
+        os.system(
+            f"cat {' '.join(r1_files)} > demultiplexed/{barcode}/test_R1.fastq.gz"
+        )
+        os.system(
+            f"cat {' '.join(r2_files)} > demultiplexed/{barcode}/test_R2.fastq.gz"
+        )
 
 
 if __name__ == "__main__":

@@ -750,6 +750,9 @@ def demultiplex(csv, r1_path, r2_path, output_dir, debug):
     demultiplexer.run(df, paired_fastqs, output_dir)
 
 
+# CONVERTED
+
+
 # combine fastqs #######################################################################
 @cli.command()
 @click.argument("csv_file", type=click.Path(exists=True))
@@ -779,6 +782,9 @@ def fastq_concat(csv_file):
         os.system(
             f"cat {' '.join(r2_files)} > demultiplexed/{barcode}/test_R2.fastq.gz"
         )
+
+
+# CONVERTED
 
 
 # combine rna-map results ############################################################
