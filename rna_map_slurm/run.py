@@ -183,7 +183,8 @@ def int_demultiplex(fastq_dir, output_dir):
     if output_dir is None:
         output_dir = os.getcwd()
     df = pd.read_csv(f"data.csv")
-    pfq = get_paired_fastqs(fastq_dir)
+    read_1_path = fastq_dir + "/test_R1.fastq.gz"
+    read_2_path = fastq_dir + "/test_R2.fastq.gz"
     if len(pfq) != 1:
         log.error(f"found {len(pfq)} paired fastq files")
         return
@@ -204,7 +205,7 @@ def int_demultiplex(fastq_dir, output_dir):
     data_path = f"{output_dir}/{unique_code}"
     df_seq = pd.read_csv(f"inputs/rnas/{row['code']}.csv")
     barcode_demultiplex(
-        df_seq, Path(pfq.read_2.path), Path(pfq.read_1.path), helices, data_path
+        df_seq, Path(read_2_path), Path(read_1_path), helices, data_path
     )
     zip_path = f"{fastq_dir}/int_demultiplexed.zip"
     flatten_and_zip_directory(data_path, zip_path)
