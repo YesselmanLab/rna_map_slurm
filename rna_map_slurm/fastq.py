@@ -73,13 +73,13 @@ def find_fastq_files(dir_path: str) -> Tuple[List[str], List[str]]:
 
     f1_paths = [
         f
-        for f in glob.glob(os.path.join(dir_path, "*_R1_*"))
+        for f in glob.glob(os.path.join(dir_path, "*_R1*"))
         if recognized_extensions.search(f)
     ]
 
     f2_paths = [
         f
-        for f in glob.glob(os.path.join(dir_path, "*_R2_*"))
+        for f in glob.glob(os.path.join(dir_path, "*_R2*"))
         if recognized_extensions.search(f)
     ]
 
