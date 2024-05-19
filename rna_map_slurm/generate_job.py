@@ -211,18 +211,18 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
     for _, row in df.iterrows():
         if pd.isnull(row["demult_cmd"]):
             continue
-        name = f"int-demultiplex-{i:04}"
-        slurm_opts = SlurmOptions(
-            name,
-            slurm_params["time"],
-            slurm_params["mem-per-cpu"],
-            slurm_params["cpus-per-task"],
-            params["slurm_options"]["extra_header_cmds"],
-        )
-        job_header = get_job_header(
-            slurm_opts, os.path.abspath("jobs/int-demultiplex/")
-        )
         for dg in dir_groups:
+            name = f"int-demultiplex-{i:04}"
+            slurm_opts = SlurmOptions(
+                name,
+                slurm_params["time"],
+                slurm_params["mem-per-cpu"],
+                slurm_params["cpus-per-task"],
+                params["slurm_options"]["extra_header_cmds"],
+            )
+            job_header = get_job_header(
+                slurm_opts, os.path.abspath("jobs/int-demultiplex/")
+            )
             job_body = ""
             for dir in dg:
                 job_body += (

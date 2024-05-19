@@ -179,7 +179,7 @@ def combine_rna_map(barcode_seq, rna_name):
 @click.argument("fastq_dir", type=click.Path(exists=True))
 @click.option("--output_dir", default=None)
 def int_demultiplex(fastq_dir, output_dir):
-    setup_logging(file_name="int_demultiplex.log")
+    setup_logging(file_name=f"{fastq_dir}/int_demultiplex.log")
     if output_dir is None:
         output_dir = os.getcwd()
     df = pd.read_csv(f"data.csv")
