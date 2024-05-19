@@ -242,5 +242,8 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
                 ]
             )
             i += 1
-    generate_submit_file("submits/README_INTERNAL_DEMULTIPLEXING", jobs)
-    return jobs
+    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    generate_submit_file(
+        "submits/README_INTERNAL_DEMULTIPLEXING", df_jobs["job"].tolist()
+    )
+    return df_jobs
