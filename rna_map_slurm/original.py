@@ -405,6 +405,7 @@ def generate_demultiplexing_jobs(params):
     return jobs
 
 
+# CONVERTED
 def generate_internal_demultiplex_jobs(params):
     os.makedirs("jobs/internal_demultiplex", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())

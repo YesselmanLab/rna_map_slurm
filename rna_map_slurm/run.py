@@ -176,14 +176,13 @@ def combine_rna_map(barcode_seq, rna_name):
 
 
 @cli.command()
-@click.argument("home_dir", type=click.Path(exists=True))
 @click.argument("fastq_dir", type=click.Path(exists=True))
 @click.option("--output_dir", default=None)
-def int_demultiplex(home_dir, fastq_dir, output_dir):
+def int_demultiplex(fastq_dir, output_dir):
     setup_logging(file_name="int_demultiplex.log")
     if output_dir is None:
         output_dir = os.getcwd()
-    df = pd.read_csv(f"{home_dir}/data.csv")
+    df = pd.read_csv(f"data.csv")
     pfq = get_paired_fastqs(fastq_dir)
     if len(pfq) != 1:
         log.error(f"found {len(pfq)} paired fastq files")
@@ -203,7 +202,7 @@ def int_demultiplex(home_dir, fastq_dir, output_dir):
             helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
     unique_code = random_string(10)
     data_path = f"{output_dir}/{unique_code}"
-    df_seq = pd.read_csv(f"{home_dir}/inputs/rnas/{row['code']}.csv")
+    df_seq = pd.read_csv(f"inputs/rnas/{row['code']}.csv")
     barcode_demultiplex(
         df_seq, Path(pfq.read_2.path), Path(pfq.read_1.path), helices, data_path
     )

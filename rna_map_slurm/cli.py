@@ -17,6 +17,7 @@ from rna_map_slurm.generate_job import (
     generate_demultiplexing_jobs,
     generate_rna_map_jobs,
     generate_rna_map_combine_jobs,
+    generate_internal_demultiplex_jobs,
 )
 
 log = get_logger(__name__)
@@ -153,6 +154,7 @@ def setup(data_csv, data_dirs, param_file):
     if "demult_cmd" not in df.columns:
         df["demult_cmd"] = np.nan
     # generate data dirs ###########################################
+    num_int_demult = 0
     for i, row in df.iterrows():
         if row["exp_name"].lower().startswith("eich"):
             continue
@@ -166,6 +168,8 @@ def setup(data_csv, data_dirs, param_file):
         if pd.isnull(row["demult_cmd"]):
             continue
         args = row["demult_cmd"].split()
+        if len(args) > 1:
+            num_int_demult += 1
         for i in range(0, len(args)):
             if args[i] == "--helix" or args[i] == "-helix":
                 helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
@@ -187,6 +191,8 @@ def setup(data_csv, data_dirs, param_file):
     df_jobs.append(generate_demultiplexing_jobs(params, num_dirs))
     df_jobs.append(generate_rna_map_jobs(params, num_dirs))
     df_jobs.append(generate_rna_map_combine_jobs(params))
+    if num_int_demult > 0:
+        df_jobs.append(generate_internal_demultiplex_jobs(params, num_dirs))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 

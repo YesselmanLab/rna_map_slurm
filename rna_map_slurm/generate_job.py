@@ -10,6 +10,11 @@ from rna_map_slurm.fastq import get_paired_fastqs, PairedFastqFiles
 log = get_logger(__name__)
 
 
+################################################################################
+############################ Use everytime function ############################
+################################################################################
+
+
 # TODO split into two jobs for each pair of fastq files
 def generate_split_fastq_jobs(
     pfqs: List[PairedFastqFiles], params: Dict
@@ -38,7 +43,7 @@ def generate_split_fastq_jobs(
         f = open(f"jobs/split-fastq/{name}.sh", "w")
         f.write(job)
         f.close()
-        jobs.append([f"jobs/split_fastq/{name}.sh", "SPLIT_FASTQ", ""])
+        jobs.append([f"jobs/split-fastq/{name}.sh", "SPLIT_FASTQ", ""])
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job"].tolist())
     return df_jobs
@@ -184,3 +189,58 @@ def generate_rna_map_combine_jobs(params):
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_RNA_MAP_COMBINE", df_jobs["job"].tolist())
     return df_jobs
+
+
+################################################################################
+############################ With internal barcodes ############################
+################################################################################
+
+
+def generate_internal_demultiplex_jobs(params, num_dirs):
+    os.makedirs("jobs/internal-demultiplex", exist_ok=True)
+    cur_dir = os.path.abspath(os.getcwd())
+    df = pd.read_csv("data.csv")
+    slurm_params = params["slurm_options"]["internal_demultiplex"]
+    runs_per_job = params["int_demultiplex_runs_per_job"]
+    dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
+    jobs = []
+    i = 0
+    dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    for _, row in df.iterrows():
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        name = f"int-demultiplex-{i:04}"
+        slurm_opts = SlurmOptions(
+            name,
+            slurm_params["time"],
+            slurm_params["mem-per-cpu"],
+            slurm_params["cpus-per-task"],
+            params["slurm_options"]["extra_header_cmds"],
+        )
+        job_header = get_job_header(
+            slurm_opts, os.path.abspath("jobs/int-demultiplex/")
+        )
+        for dg in dir_groups:
+            job_body = ""
+            for dir in dg:
+                job_body += (
+                    f"cd {cur_dir}\n"
+                    f"rna-map-slurm-runner int-demultiplex {dir}/{row['barcode_seq']} "
+                    f"--output_dir /scratch/\n\n"
+                )
+            job = job_header + job_body
+            f = open(f"jobs/internal_demultiplex/{name}.sh", "w")
+            f.write(job)
+            f.close()
+            jobs.append(
+                [
+                    f"jobs/internal_demultiplex/{name}.sh",
+                    "INTERNAL_DEMULTIPLEXING",
+                    "DEMULTIPLEXING",
+                ]
+            )
+            i += 1
+    generate_submit_file("submits/README_INTERNAL_DEMULTIPLEXING", jobs)
+    return jobs
