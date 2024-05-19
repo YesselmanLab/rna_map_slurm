@@ -1,4 +1,1 @@
 wheel>=0.22
-click
-fastqsplitter
-# TODO add gsheets

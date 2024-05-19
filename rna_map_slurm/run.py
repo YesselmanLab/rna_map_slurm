@@ -185,10 +185,6 @@ def int_demultiplex(fastq_dir, output_dir):
     df = pd.read_csv(f"data.csv")
     read_1_path = fastq_dir + "/test_R1.fastq.gz"
     read_2_path = fastq_dir + "/test_R2.fastq.gz"
-    if len(pfq) != 1:
-        log.error(f"found {len(pfq)} paired fastq files")
-        return
-    pfq = pfq[0]
     barcode_seq = Path(fastq_dir).stem
     df_sub = df.loc[df["barcode_seq"] == barcode_seq]
     if df_sub.empty:
