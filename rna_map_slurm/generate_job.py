@@ -201,7 +201,7 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
     cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["internal_demultiplex"]
-    runs_per_job = params["int_demultiplex_runs_per_job"]
+    runs_per_job = params["tasks_per_job"]["internal_demultiplex"]
     dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
     jobs = []
     i = 0
