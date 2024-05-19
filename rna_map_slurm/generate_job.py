@@ -231,12 +231,12 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
                     f"--output_dir /scratch/\n\n"
                 )
             job = job_header + job_body
-            f = open(f"jobs/internal_demultiplex/{name}.sh", "w")
+            f = open(f"jobs/internal-demultiplex/{name}.sh", "w")
             f.write(job)
             f.close()
             jobs.append(
                 [
-                    f"jobs/internal_demultiplex/{name}.sh",
+                    f"jobs/internal-demultiplex/{name}.sh",
                     "INTERNAL_DEMULTIPLEXING",
                     "DEMULTIPLEXING",
                 ]
