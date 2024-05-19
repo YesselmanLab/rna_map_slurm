@@ -26,11 +26,6 @@ def random_string(length):
     return "".join(random.choices(string.ascii_letters, k=length))
 
 
-import os
-import gzip
-import shutil
-
-
 def gzip_files(directory):
     """
     Compresses all files in the specified directory (excluding already compressed files) using gzip compression.
@@ -51,3 +46,12 @@ def gzip_files(directory):
                         shutil.copyfileobj(f_in, f_out)
 
                 os.remove(file_path)  # Remove the original file
+
+
+def flatten_and_zip_directory(input_directory, output_zip):
+    with zipfile.ZipFile(output_zip, "w") as zip_ref:
+        for root, _, files in os.walk(input_directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Save the file in the zip with only its base name
+                zip_ref.write(file_path, os.path.basename(file))

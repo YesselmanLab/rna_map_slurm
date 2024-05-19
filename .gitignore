@@ -1,6 +1,9 @@
 *.py[cod]
 .DS_Store
 
+# test directory 
+test/test_dir/
+
 # C extensions
 *.so
 

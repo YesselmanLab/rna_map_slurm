@@ -166,6 +166,9 @@ def random_string(length):
     return "".join(random.choices(string.ascii_letters, k=length))
 
 
+# CONVERTED
+
+
 def flatten_and_zip_directory(input_directory, output_zip):
     with zipfile.ZipFile(output_zip, "w") as zip_ref:
         for root, _, files in os.walk(input_directory):

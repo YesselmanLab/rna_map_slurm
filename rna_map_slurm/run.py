@@ -1,8 +1,10 @@
 import os
 import glob
+import shutil
 import click
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
@@ -13,11 +15,14 @@ from rna_map.mutation_histogram import (
     get_dataframe,
 )
 
+from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
+
+
 from rna_map_slurm.logger import setup_logging, get_logger
-from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
+from rna_map_slurm.fastq import PairedFastqFiles, FastqFile, get_paired_fastqs
 from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.plotting import plot_pop_avg_from_row
-import click
+from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_directory
 
 log = get_logger(__name__)
 
@@ -170,6 +175,43 @@ def combine_rna_map(barcode_seq, rna_name):
 ################################################################################
 
 
+@cli.command()
+@click.argument("home_dir", type=click.Path(exists=True))
+@click.argument("fastq_dir", type=click.Path(exists=True))
+@click.option("--output_dir", default=None)
+def int_demultiplex(home_dir, fastq_dir, output_dir):
+    setup_logging(file_name="int_demultiplex.log")
+    if output_dir is None:
+        output_dir = os.getcwd()
+    df = pd.read_csv(f"{home_dir}/data.csv")
+    pfq = get_paired_fastqs(fastq_dir)
+    if len(pfq) != 1:
+        log.error(f"found {len(pfq)} paired fastq files")
+        return
+    pfq = pfq[0]
+    barcode_seq = Path(fastq_dir).stem
+    df_sub = df.loc[df["barcode_seq"] == barcode_seq]
+    if df_sub.empty:
+        log.error(f"barcode_seq {barcode_seq} not found in data.csv")
+        return
+    row = df_sub.iloc[0]
+    # get helices from commandline
+    helices = []
+    args = row["demult_cmd"].split()
+    for i in range(0, len(args)):
+        if args[i] == "--helix" or args[i] == "-helix":
+            helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
+    unique_code = random_string(10)
+    data_path = f"{output_dir}/{unique_code}"
+    df_seq = pd.read_csv(f"{home_dir}/inputs/rnas/{row['code']}.csv")
+    barcode_demultiplex(
+        df_seq, Path(pfq.read_2.path), Path(pfq.read_1.path), helices, data_path
+    )
+    zip_path = f"{fastq_dir}/int_demultiplexed.zip"
+    flatten_and_zip_directory(data_path, zip_path)
+    shutil.rmtree(data_path)
+
+
 ################################################################################
 ############################## Summary functions ###############################
 ################################################################################
@@ -179,6 +221,7 @@ def combine_rna_map(barcode_seq, rna_name):
 @cli.command()
 @click.option("--combine-all", is_flag=True)
 def fastq_concat(combine_all):
+    setup_logging()
     os.makedirs(f"demultiplexed", exist_ok=True)
     df = pd.read_csv("data.csv")
     seq_path = os.environ["SEQPATH"]
