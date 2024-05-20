@@ -3,6 +3,7 @@ import string
 import os
 import shutil
 import gzip
+import zipfile
 
 from rna_map_slurm.logger import get_logger
 
