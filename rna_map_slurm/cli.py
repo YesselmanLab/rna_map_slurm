@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import shutil
 import json
+import glob
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -196,6 +197,27 @@ def setup(data_csv, data_dirs, param_file):
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 
+
+@cli.command()
+@click.argument("stage")
+def clean(stage):
+    setup_logging()
+    if stage == "all":
+        log.info("Cleaning all directories")
+        shutil.rmtree("jobs", ignore_errors=True)
+        shutil.rmtree("submits", ignore_errors=True)
+        shutil.rmtree("data", ignore_errors=True)
+        shutil.rmtree("inputs", ignore_errors=True)
+    elif stage == "demultiplex":
+        log.info("Cleaning demultiplex directories")
+        dirs = glob.glob("data/split-*/[ACGT]*")
+    elif stage == "rna_map":
+        log.info("Cleaning rna_map directories")
+        dirs = glob.glob("data/split-*/[ACGT]*/*")
+        for d in dirs:
+            if not os.path.isdir(d):
+                continue
+            os.system(f"rm -rf {d}/*")
 
 if __name__ == "__main__":
     cli()
