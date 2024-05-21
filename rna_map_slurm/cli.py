@@ -19,6 +19,7 @@ from rna_map_slurm.generate_job import (
     generate_rna_map_jobs,
     generate_rna_map_combine_jobs,
     generate_internal_demultiplex_jobs,
+    generate_join_int_demultiplex_jobs
 )
 
 log = get_logger(__name__)
@@ -194,6 +195,7 @@ def setup(data_csv, data_dirs, param_file):
     df_jobs.append(generate_rna_map_combine_jobs(params))
     if num_int_demult > 0:
         df_jobs.append(generate_internal_demultiplex_jobs(params, num_dirs))
+        df_jobs.append(generate_join_int_demultiplex_jobs(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 

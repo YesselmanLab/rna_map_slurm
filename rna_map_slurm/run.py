@@ -52,8 +52,13 @@ def process_pair(name_pair, barcode, zip_files, outdir, tmp_dir):
             continue
     mate1_files = glob.glob(f"{tmp_dir}/*/{pair[0]}")
     mate2_files = glob.glob(f"{tmp_dir}/*/{pair[1]}")
-    # if len(mate1_files) < 1:
-    print(construct_barcode, len(mate1_files), len(mate2_files))
+    if len(mate1_files) == 0:
+        log.warning(f"no files found for {construct_barcode}")
+        return
+    if len(mate1_files) != len(mate2_files):
+        log.warning(f"mismatched files for {construct_barcode}")
+        return 
+    log.info(f"{construct_barcode} {len(mate1_files)} {len(mate2_files)}")
     combine_gzipped_fastq(mate1_files, f"{outdir}/{pair[0]}")
     combine_gzipped_fastq(mate2_files, f"{outdir}/{pair[1]}")
     subprocess.call(f"rm -r {tmp_dir}/*/{pair[0]}", shell=True)
