@@ -219,5 +219,6 @@ def clean(stage):
                 continue
             os.system(f"rm -rf {d}/*")
 
+
 if __name__ == "__main__":
     cli()

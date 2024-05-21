@@ -447,6 +447,9 @@ def generate_internal_demultiplex_jobs(params):
     return jobs
 
 
+# CONVERTED
+
+
 def generate_join_int_demultiplex_jobs(params):
     cur_dir = os.path.abspath(os.getcwd())
     threads = 8
@@ -829,6 +832,9 @@ def combine_rna_map(home_dir, barcode_seq, rna_name):
             except:
                 print(f"could not open file: {mhs_path}")
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
+
+
+# CONVERTED
 
 
 # internal demultiplex ###############################################################

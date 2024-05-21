@@ -247,3 +247,38 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
         "submits/README_INTERNAL_DEMULTIPLEXING", df_jobs["job"].tolist()
     )
     return df_jobs
+
+
+def generate_join_int_demultiplex_jobs(params):
+    os.makedirs("jobs/join-int-demultiplex", exist_ok=True)
+    cur_dir = os.path.abspath(os.getcwd())
+    df = pd.read_csv("data.csv")
+    slurm_params = params["slurm_options"]["join_internal_demultiplex"]
+    runs_per_job = params["tasks_per_job"]["join_internal_demultiplex"]
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    fsum = open("submits/README_JOIN_INT_DEMULTIPLEX", "w")
+    for i, row in df.iterrows():
+        name = f"join-int-demultiplex-{i:04}"
+        slurm_opts = SlurmOptions(
+            name,
+            slurm_params["time"],
+            slurm_params["mem-per-cpu"],
+            slurm_params["cpus-per-task"],
+            params["slurm_options"]["extra_header_cmds"],
+        )
+        job_header = get_job_header(
+            slurm_opts, os.path.abspath("jobs/join-int-demultiplex/")
+        )
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        job_body = (
+            f"rna-map-slurm-runner join-int-demultiplex {cur_dir} "
+            f"{row['barcode_seq']} --tmp_dir /scratch/ --threads {slurm_params['cpus-per-task']}\n"
+        )
+        job = job_header + job_body
+        f = open(f"jobs/join-int-demultiplex/join-int-demultiplex-{i:04}.sh", "w")
+        f.write(job)
+        f.close()
+        fsum.write(f"sbatch jobs/join-int-demultiplex/join-int-demultiplex-{i:04}.sh\n")
+    fsum.close()
