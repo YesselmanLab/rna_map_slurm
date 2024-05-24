@@ -19,7 +19,7 @@ from rna_map_slurm.generate_job import (
     generate_rna_map_jobs,
     generate_rna_map_combine_jobs,
     generate_internal_demultiplex_jobs,
-    generate_join_int_demultiplex_jobs
+    generate_join_int_demultiplex_jobs,
 )
 
 log = get_logger(__name__)
@@ -220,6 +220,36 @@ def clean(stage):
             if not os.path.isdir(d):
                 continue
             os.system(f"rm -rf {d}/*")
+
+
+@cli.command()
+@click.argument("csv")
+def zip_demultiplex_subset(csv):
+    df = pd.read_csv(csv)
+    base_path = "demultiplex/"
+    # Get the list of barcodes from the DataFrame
+    barcodes = df["barcode_seq"].unique()
+
+    # Create a zip file for all barcodes
+    zip_filename = "demultiplex_subset.zip"
+    with zipfile.ZipFile(zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for barcode in barcodes:
+            # Create the path to the barcode directory
+            barcode_path = os.path.join(base_path, barcode)
+            if not os.path.exists(barcode_path):
+                print(f"Barcode path {barcode_path} does not exist, skipping.")
+                continue
+
+            # Find all .gz files in the barcode directory
+            for root, _, files in os.walk(barcode_path):
+                for file in files:
+                    if file.endswith(".gz"):
+                        file_path = os.path.join(root, file)
+                        # Add the file to the zip file, preserving the directory structure
+                        zipf.write(file_path, os.path.relpath(file_path, base_path))
+                        print(f"Added {file_path} to {zip_filename}")
+
+    print(f"Created zip file {zip_filename}")
 
 
 if __name__ == "__main__":
