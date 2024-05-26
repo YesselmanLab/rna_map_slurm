@@ -5,6 +5,7 @@ import numpy as np
 import shutil
 import json
 import glob
+import zipfile
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -226,7 +227,7 @@ def clean(stage):
 @click.argument("csv")
 def zip_demultiplex_subset(csv):
     df = pd.read_csv(csv)
-    base_path = "demultiplex/"
+    base_path = "demultiplexed/"
     # Get the list of barcodes from the DataFrame
     barcodes = df["barcode_seq"].unique()
 
