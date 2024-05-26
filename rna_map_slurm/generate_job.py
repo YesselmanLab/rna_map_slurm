@@ -197,7 +197,7 @@ def generate_rna_map_combine_jobs(params):
 
 
 def generate_internal_demultiplex_jobs(params, num_dirs):
-    os.makedirs("jobs/internal-demultiplex", exist_ok=True)
+    os.makedirs("jobs/int-demultiplex", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["internal_demultiplex"]
@@ -231,12 +231,12 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
                     f"--output_dir /scratch/\n\n"
                 )
             job = job_header + job_body
-            f = open(f"jobs/internal-demultiplex/{name}.sh", "w")
+            f = open(f"jobs/int-demultiplex/{name}.sh", "w")
             f.write(job)
             f.close()
             jobs.append(
                 [
-                    f"jobs/internal-demultiplex/{name}.sh",
+                    f"jobs/int-demultiplex/{name}.sh",
                     "INTERNAL_DEMULTIPLEXING",
                     "DEMULTIPLEXING",
                 ]
