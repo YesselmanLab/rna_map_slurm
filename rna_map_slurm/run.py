@@ -12,14 +12,18 @@ from concurrent.futures import ProcessPoolExecutor
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
+from seq_tools.dataframe import to_fasta, to_dna
+
+from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
+
+import rna_map
 from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
     get_mut_histos_from_pickle_file,
     write_mut_histos_to_pickle_file,
     get_dataframe,
 )
-
-from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
+from rna_map.parameters import get_preset_params
 
 
 from rna_map_slurm.logger import setup_logging, get_logger
@@ -57,12 +61,17 @@ def process_pair(name_pair, barcode, zip_files, outdir, tmp_dir):
         return
     if len(mate1_files) != len(mate2_files):
         log.warning(f"mismatched files for {construct_barcode}")
-        return 
+        return
     log.info(f"{construct_barcode} {len(mate1_files)} {len(mate2_files)}")
     combine_gzipped_fastq(mate1_files, f"{outdir}/{pair[0]}")
     combine_gzipped_fastq(mate2_files, f"{outdir}/{pair[1]}")
     subprocess.call(f"rm -r {tmp_dir}/*/{pair[0]}", shell=True)
     subprocess.call(f"rm -r {tmp_dir}/*/{pair[1]}", shell=True)
+
+
+def get_file_size(file_path):
+    file_path = os.path.realpath(file_path)
+    return os.path.getsize(file_path)
 
 
 @click.group()
@@ -142,12 +151,19 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
 def combine_rna_map(barcode_seq, rna_name):
     setup_logging()
     df = pd.read_csv("data.csv")
-    df_sub = df[df["barcode_seq"] == barcode_seq]
+    df_sub = df.query(f"barcode_seq == {barcode_seq} and rna_name == {rna_name}")
     if len(df_sub) == 0:
-        log.error(f"barcode_seq {barcode_seq} not found in data.csv")
+        log.error(
+            f"barcode_seq {barcode_seq} with rna {rna_name} not found in data.csv"
+        )
         return
+    if len(df_sub) > 1:
+        log.warning(
+            f"barcode_seq {barcode_seq} with rna {rna_name} has multiple entries in data.csv"
+        )
     row = df_sub.iloc[0]
     os.makedirs("results", exist_ok=True)
+    os.makedirs("results/pop_avg_pngs", exist_ok=True)
     run_path = "results/" + row["run_name"]
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
@@ -205,6 +221,10 @@ def combine_rna_map(barcode_seq, rna_name):
         i += 1
         if i > 100:
             break
+    shutil.copy(
+        final_path + f"{row['name']}.png",
+        f"results/pop_avg_pngs/{row['rna_name']}_{row['name']}.png",
+    )
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
@@ -295,6 +315,71 @@ def join_int_demultiplex(home_dir, barcode_seq, threads, tmp_dir):
     for zip_file in zip_files:
         shutil.rmtree(f"{tmp_dir}/{count}")
         count += 1
+
+
+@cli.command()
+@click.argument("home_dir", type=click.Path(exists=True))
+@click.argument("lib_barcode_seq")
+@click.argument("construct_barcode_seq")
+@click.option("--tmp_dir", default=None)
+def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp_dir):
+    setup_logging()
+    if tmp_dir is None:
+        tmp_dir = os.getcwd()
+    # get fastq files
+    fastq_dir = f"{home_dir}/joined_fastqs/{lib_barcode_seq}"
+    log.info(fastq_dir)
+    log.info(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")
+    mate_1_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")[0]
+    mate_2_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate2.fastq.gz")[0]
+    # check to make sure files actually have stuff in them
+    fsize_1 = get_file_size(mate_1_path)
+    fsize_2 = get_file_size(mate_2_path)
+    if fsize_1 < 100 or fsize_2 < 100:
+        log.warning(f"skipping {construct_barcode_seq} because file size is too small")
+        return
+    # get sequences to make input files
+    df = pd.read_csv("data.csv")
+    row = df[df["barcode_seq"] == lib_barcode_seq].iloc[0]
+    df_barcode = pd.read_json(f"{home_dir}/inputs/barcode_jsons/{row['code']}.json")
+    df_barcode = df_barcode[df_barcode["full_barcode"] == construct_barcode_seq]
+    tmp_dir = tmp_dir + "/" + random_string(10)
+    os.makedirs(tmp_dir, exist_ok=True)
+    to_fasta(to_dna(df_barcode), f"{tmp_dir}/test.fasta")
+    df_barcode = df_barcode[["name", "sequence", "structure"]]
+    df_barcode.to_csv(f"{tmp_dir}/test.csv", index=False)
+    # update params
+    params = get_preset_params("barcoded-library")
+    params["dirs"]["log"] = f"{tmp_dir}/log"
+    params["dirs"]["input"] = f"{tmp_dir}/input"
+    params["dirs"]["output"] = f"{tmp_dir}/output"
+    # run rna-map
+    rna_map.run.run(
+        f"{tmp_dir}/test.fasta", mate_1_path, mate_2_path, f"{tmp_dir}/test.csv", params
+    )
+    # clean up unncessary files
+    shutil.rmtree(f"{tmp_dir}/log")
+    os.makedirs(f"{tmp_dir}/input", exist_ok=True)
+    # move to unique name to avoid collisions
+    shutil.move(
+        f"{tmp_dir}/output/BitVector_Files/mutation_histos.p",
+        f"{home_dir}/rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
+    )
+    shutil.rmtree(tmp_dir)
+
+
+# single ###########################################################################
+
+
+@cli.command()
+@click.argument("run_name")
+def single_run(run_name):
+    setup_logging(file_name="demultiplex.log")
+
+    paired_fastqs = PairedFastqFiles(FastqFile(r1_path), FastqFile(r2_path))
+    df = pd.read_csv(csv)
+    demultiplexer = SabreDemultiplexer()
+    demultiplexer.run(df, paired_fastqs, "demultiplexed")
 
 
 ################################################################################

@@ -178,12 +178,18 @@ def flatten_and_zip_directory(input_directory, output_zip):
                 zip_ref.write(file_path, os.path.basename(file))
 
 
+# CONVERTED
+
+
 def combine_gzipped_fastq(input_files, output_file):
     with gzip.open(output_file, "wb") as output_gz:
         for input_file in input_files:
             with gzip.open(input_file, "rb") as input_gz:
                 for line in input_gz:
                     output_gz.write(line)
+
+
+# CONVERTED
 
 
 def process_pair(name_pair, barcode, zip_files, outdir, tmp_dir):
@@ -205,6 +211,9 @@ def process_pair(name_pair, barcode, zip_files, outdir, tmp_dir):
     combine_gzipped_fastq(mate2_files, f"{outdir}/{pair[1]}")
     subprocess.call(f"rm -r {tmp_dir}/*/{pair[0]}", shell=True)
     subprocess.call(f"rm -r {tmp_dir}/*/{pair[1]}", shell=True)
+
+
+# CONVERTED
 
 
 def get_file_size(file_path):
@@ -474,6 +483,9 @@ def generate_join_int_demultiplex_jobs(params):
     fsum.close()
 
 
+# CONVERTED
+
+
 def generate_fastq_joining_jobs(params):
     os.makedirs("jobs/fastq_joining", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
@@ -493,6 +505,9 @@ def generate_fastq_joining_jobs(params):
         ]
     ]
     generate_submit_file("submits/README_FASTQ_JOINING", jobs)
+
+
+# CONVERTED
 
 
 # just normal rna-map
@@ -544,6 +559,9 @@ def generate_rna_map_jobs(params):
             count += 1
     generate_submit_file("submits/README_RNA_MAP", jobs)
     return jobs
+
+
+# CONVERTED
 
 
 def generate_rna_map_combine_jobs(params):
@@ -870,6 +888,9 @@ def int_demultiplex(home_dir, fastq_dir, output_dir):
     shutil.rmtree(data_path)
 
 
+# CONVERTED
+
+
 # join internal demultiplex ##########################################################
 @cli.command()
 @click.argument("home_dir", type=click.Path(exists=True))
@@ -1003,6 +1024,8 @@ def combine_rna_map_single_barcode(home_dir, barcode_seq):
                 merged_mut_histos, get_mut_histos_from_pickle_file(mhs_file)
             )
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
+
+
 
 
 # pylint: disable=no-value-for-parameter

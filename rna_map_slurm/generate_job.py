@@ -254,7 +254,6 @@ def generate_join_int_demultiplex_jobs(params):
     cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["join_internal_demultiplex"]
-    runs_per_job = params["tasks_per_job"]["join_internal_demultiplex"]
     if "demult_cmd" not in df.columns:
         df["demult_cmd"] = np.nan
     fsum = open("submits/README_JOIN_INT_DEMULTIPLEX", "w")
@@ -281,4 +280,56 @@ def generate_join_int_demultiplex_jobs(params):
         f.write(job)
         f.close()
         fsum.write(f"sbatch jobs/join-int-demultiplex/join-int-demultiplex-{i:04}.sh\n")
+    fsum.close()
+
+
+def generate_rna_map_single_barcode_jobs(params):
+    cur_dir = os.path.abspath(os.getcwd())
+    df = pd.read_csv("data.csv")
+    slurm_params = params["slurm_options"]["rna_map_single_barcode"]
+    runs_per_job = params["tasks_per_job"]["rna_map_single_barcode"]
+    runs = []
+    if "demult_cmd" not in df.columns:
+        df["demult_cmd"] = np.nan
+    for i, row in df.iterrows():
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        os.makedirs(f"rna_map/{row['barcode_seq']}", exist_ok=True)
+        df_barcode = pd.read_json(
+            f"{params['input_dir']}/barcode_jsons/{row['code']}.json"
+        )
+        unique_barcodes = df_barcode["full_barcode"].unique()
+        for barcode in unique_barcodes:
+            runs.append([row["barcode_seq"], barcode])
+    run_groups = [runs[i : i + runs_per_job] for i in range(0, len(runs), runs_per_job)]
+    fsum = open("submits/README_RNA_MAP_SB", "w")
+    count = 0
+    for i, group in enumerate(run_groups):
+        name = f"rna-map-single-barcode{i:04}"
+        slurm_opts = SlurmOptions(
+            name,
+            slurm_params["time"],
+            slurm_params["mem-per-cpu"],
+            slurm_params["cpus-per-task"],
+            params["slurm_options"]["extra_header_cmds"],
+        )
+        job_header = get_job_header(
+            slurm_opts, os.path.abspath("jobs/rna-map-single-barcode/")
+        )
+        job_body = ""
+        for run in group:
+            job_body += (
+                f"rna-map-slurm-runner rna-map-single-barcode {cur_dir} "
+                f"{run[0]} {run[1]} --tmp_dir /scratch/\n"
+            )
+        job = job_header + job_body
+        f = open(
+            f"jobs/rna-map-single-barcode/rna-map-single-barcode-{count:04}.sh", "w"
+        )
+        f.write(job)
+        f.close()
+        fsum.write(
+            f"sbatch jobs/rna-map-single-barcode/rna-map-single-barcode-{count:04}.sh\n"
+        )
+        count += 1
     fsum.close()
