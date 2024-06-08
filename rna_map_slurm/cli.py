@@ -6,6 +6,7 @@ import shutil
 import json
 import glob
 import zipfile
+import time
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -22,6 +23,7 @@ from rna_map_slurm.generate_job import (
     generate_internal_demultiplex_jobs,
     generate_join_int_demultiplex_jobs,
 )
+from rna_map_slurm.jobs import get_user_jobs
 
 log = get_logger(__name__)
 
@@ -111,6 +113,16 @@ def get_seq_path(params) -> str:
 @click.group()
 def cli():
     pass
+
+@cli.command()
+def run():
+    #user_jobs = get_user_jobs("jyesselm")
+    df = pd.read_json("jobs.csv")
+    df_can_run = df.query("job_requirement is None")
+    print(df_can_run)
+    #while True:
+    #    time.sleep(60)
+
 
 
 @cli.command()

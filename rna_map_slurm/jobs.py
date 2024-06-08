@@ -75,11 +75,12 @@ def get_user_jobs(user):
         # Parse the lines into a list of dictionaries
         jobs = [dict(zip(keys, line.split())) for line in lines]
 
+        return jobs
         # Write the jobs data to a JSON file
-        with open(f"{user}_jobs.json", "w") as f:
-            json.dump(jobs, f, indent=4)
+        #with open(f"{user}_jobs.json", "w") as f:
+        #    json.dump(jobs, f, indent=4)
 
-        print(f"Job data for user '{user}' has been saved to {user}_jobs.json")
+        #print(f"Job data for user '{user}' has been saved to {user}_jobs.json")
 
     except subprocess.CalledProcessError as e:
         print(f"Error: {e.stderr}")

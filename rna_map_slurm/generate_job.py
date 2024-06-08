@@ -43,8 +43,8 @@ def generate_split_fastq_jobs(
         f = open(f"jobs/split-fastq/{name}.sh", "w")
         f.write(job)
         f.close()
-        jobs.append([f"jobs/split-fastq/{name}.sh", "SPLIT_FASTQ", ""])
-    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+        jobs.append([f"jobs/split-fastq/{name}.sh", "split-fastq", ""])
+    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
     generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job"].tolist())
     return df_jobs
 
@@ -81,11 +81,11 @@ def generate_demultiplexing_jobs(params, num_dirs):
         jobs.append(
             [
                 f"jobs/demultiplex/demultiplex-{i:04}.sh",
-                "DEMULTIPLEXING",
-                "FASTQ_SPLITTING",
+                "demultiplex",
+                "split-fastq",
             ]
         )
-    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
     generate_submit_file("submits/README_DEMULTIPLEXING", df_jobs["job"].tolist())
     return df_jobs
 
@@ -144,7 +144,7 @@ def generate_rna_map_jobs(params, num_dirs):
             f = open(f"jobs/rna-map/{name}.sh", "w")
             f.write(job)
             f.close()
-            jobs.append([f"jobs/rna-map/{name}.sh", "RNA_MAP", "DEMULTIPLEXING"])
+            jobs.append([f"jobs/rna-map/{name}.sh", "rna-map", "demultiplex"])
             count += 1
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
     generate_submit_file("submits/README_RNA_MAP", df_jobs["job"].tolist())
@@ -182,8 +182,8 @@ def generate_rna_map_combine_jobs(params):
         jobs.append(
             [
                 f"jobs/rna-map-combine/{name}.sh",
-                "RNA_MAP_COMBINE",
-                "RNA_MAP",
+                "rna-map-combine",
+                "rna-map",
             ]
         )
     df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
@@ -237,8 +237,8 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
             jobs.append(
                 [
                     f"jobs/int-demultiplex/{name}.sh",
-                    "INTERNAL_DEMULTIPLEXING",
-                    "DEMULTIPLEXING",
+                    "int-demultiplex",
+                    "demultiplex",
                 ]
             )
             i += 1

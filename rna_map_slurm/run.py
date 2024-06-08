@@ -32,7 +32,7 @@ from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.plotting import plot_pop_avg_from_row
 from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_directory
 
-log = get_logger(__name__)
+log = get_logger("cli")
 
 
 def combine_gzipped_fastq(input_files, output_file):
@@ -151,7 +151,7 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
 def combine_rna_map(barcode_seq, rna_name):
     setup_logging()
     df = pd.read_csv("data.csv")
-    df_sub = df.query(f"barcode_seq == {barcode_seq} and rna_name == {rna_name}")
+    df_sub = df.query("barcode_seq == @barcode_seq and construct == @rna_name")
     if len(df_sub) == 0:
         log.error(
             f"barcode_seq {barcode_seq} with rna {rna_name} not found in data.csv"
@@ -216,15 +216,16 @@ def combine_rna_map(barcode_seq, rna_name):
     i = 0
     for _, row in df_results.iterrows():
         plot_pop_avg_from_row(row)
+        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         plt.savefig(final_path + f"{row['name']}.png")
         plt.close()
         i += 1
         if i > 100:
             break
-    shutil.copy(
-        final_path + f"{row['name']}.png",
-        f"results/pop_avg_pngs/{row['rna_name']}_{row['name']}.png",
-    )
+        shutil.copy(
+            final_path + f"{row['name']}.png",
+            f"results/pop_avg_pngs/{dir_name}_{row['name']}.png",
+        )
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
