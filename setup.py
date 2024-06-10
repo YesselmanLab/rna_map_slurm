@@ -43,6 +43,8 @@ setup(
         "rna_map_slurm/parameters",
         "rna_map_slurm/paths",
         "rna_map_slurm/run",
+        "rna_map_slurm/run_celery",
+        "rna_map_slurm/tasks",
         "rna_map_slurm/util",
     ],
     include_package_data=True,
