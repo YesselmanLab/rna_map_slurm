@@ -1,0 +1,17 @@
+from celery import Celery
+
+app = Celery('rna_map_slurm')
+
+app.conf.broker_url = 'amqp://myuser:mypassword@{hostname}//'
+
+app.conf.update(
+    result_backend='rpc://',
+    task_serializer='json',
+    result_serializer='json',
+    accept_content=['json'],
+    timezone='UTC',
+    enable_utc=True,
+)
+
+# Configure Celery to auto-discover tasks from the my_library package
+app.autodiscover_tasks(['rna_map_slurm'])

@@ -7,6 +7,7 @@ import json
 import glob
 import zipfile
 import time
+import subprocess
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -87,6 +88,7 @@ def format_sequencing_run_info(df: pd.DataFrame):
     return df
 
 
+# TODO check if valid path?
 def get_seq_path(params) -> str:
     """
     Gets the path where sequence information is stored. First check the environ
@@ -107,22 +109,102 @@ def get_seq_path(params) -> str:
     if seq_path == "":
         seq_path = params["paths"]["seq_path"]
         log.info(f"setting seq_path from params file: {seq_path}")
+    if seq_path == "":
+        log.error("SEQPATH not set in environment variable or params file")
+        exit()
     return seq_path
 
 
+def submit_jobs(df):
+    """
+    Submits jobs to the SLURM scheduler.
+
+    Args:
+        df (pandas.DataFrame): The DataFrame containing the jobs to submit.
+    """
+    log.info("Submitting jobs")
+    for _, row in df.iterrows():
+        os.system(f"sbatch {row['job_path']}")
+
+
+# TODO need to update this so can use sacct
+# need to record which just has which id 
+def is_job_type_completed(job_type, jobs):
+    """
+    Check if a specific job type is completed. the job_type should be a substring of the job name
+    in the jobs Name dictionary
+
+    Args:
+        job_type (str): The type of job to check.
+        jobs (list): A list of job objects, each is a dictionary.
+
+    Returns:
+        bool: True if all jobs are completed i.e. not running anymore.
+    """
+    for job in jobs:
+        if job_type in job["Name"]:
+            return False
+    return True
+              
 @click.group()
 def cli():
     pass
 
+# TODO need a way to check to see if existing jobs have been run
 @cli.command()
 def run():
+    setup_logging(file_name="run.log")
     #user_jobs = get_user_jobs("jyesselm")
-    df = pd.read_json("jobs.csv")
-    df_can_run = df.query("job_requirement is None")
-    print(df_can_run)
-    #while True:
-    #    time.sleep(60)
+    df = pd.read_csv("jobs.csv")
+    df["status"] = "not_started"
+    df_can_run = df[df['job_requirement'].isna()]
+    df.loc[ df['job_requirement'].isna(), "status"] = "run"
+    completed_types = [] 
+    submitted_types = df_can_run["job_type"].to_list()
+    submit_jobs(df_can_run)
+    while True:        
+        # Wait for the submitted jobs to finish
+        time.sleep(60)
+        jobs = get_user_jobs("jyesselm")
+        log.info("num_jobs: " + str(len(jobs)))
+        log.info("submitted_types: " + str(submitted_types))
+        log.info("completed_types: " + str(completed_types))
+        for job_type in submitted_types:
+            if is_job_type_completed(job_type, jobs):
+                log.info(f"Job type {job_type} is completed")
+                completed_types.append(job_type)
+        for job_type in completed_types:
+            if job_type in submitted_types:
+                submitted_types.remove(job_type)
+        
+        df_not_run = df[(~df["job_type"].isin(completed_types)) & (df["status"] == "not_started")]
+        submitted = False
+        for job_type, g in df_not_run.groupby("job_type"):
+            requirement = g["job_requirement"].iloc[0]
+            if requirement not in completed_types:
+                continue
+            job_num = len(jobs)
+            count = 0
+            log.info(f"Submitting jobs for {job_type}")
+            if job_type not in submitted_types:
+                submitted_types.append(job_type)
+            for _, row in g.iterrows():
+                if job_num > 999:
+                    break
+                os.system(f"sbatch {row['job_path']}")
+                job_num += 1
+                df.loc[row.name, "status"] = "run"
+                submitted = True
+                count += 1
+            log.info(f"Submitted {count} jobs for {job_type}")
+            if submitted:
+                break
 
+            
+@cli.command()
+def setup_celery():
+    output = subprocess.run("hostname -I", shell=True, capture_output=True, text=True)
+    print(output.stdout)
 
 
 @cli.command()

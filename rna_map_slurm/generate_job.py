@@ -45,7 +45,7 @@ def generate_split_fastq_jobs(
         f.close()
         jobs.append([f"jobs/split-fastq/{name}.sh", "split-fastq", ""])
     df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
-    generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job"].tolist())
+    generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job_path"].tolist())
     return df_jobs
 
 
@@ -86,7 +86,7 @@ def generate_demultiplexing_jobs(params, num_dirs):
             ]
         )
     df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
-    generate_submit_file("submits/README_DEMULTIPLEXING", df_jobs["job"].tolist())
+    generate_submit_file("submits/README_DEMULTIPLEXING", df_jobs["job_path"].tolist())
     return df_jobs
 
 
@@ -146,8 +146,8 @@ def generate_rna_map_jobs(params, num_dirs):
             f.close()
             jobs.append([f"jobs/rna-map/{name}.sh", "rna-map", "demultiplex"])
             count += 1
-    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
-    generate_submit_file("submits/README_RNA_MAP", df_jobs["job"].tolist())
+    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
+    generate_submit_file("submits/README_RNA_MAP", df_jobs["job_path"].tolist())
     return df_jobs
 
 
@@ -186,8 +186,8 @@ def generate_rna_map_combine_jobs(params):
                 "rna-map",
             ]
         )
-    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
-    generate_submit_file("submits/README_RNA_MAP_COMBINE", df_jobs["job"].tolist())
+    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
+    generate_submit_file("submits/README_RNA_MAP_COMBINE", df_jobs["job_path"].tolist())
     return df_jobs
 
 
@@ -242,9 +242,9 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
                 ]
             )
             i += 1
-    df_jobs = pd.DataFrame(jobs, columns=["job", "type", "status"])
+    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
     generate_submit_file(
-        "submits/README_INTERNAL_DEMULTIPLEXING", df_jobs["job"].tolist()
+        "submits/README_INTERNAL_DEMULTIPLEXING", df_jobs["job_path"].tolist()
     )
     return df_jobs
 

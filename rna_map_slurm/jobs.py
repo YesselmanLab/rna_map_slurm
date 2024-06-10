@@ -74,6 +74,10 @@ def get_user_jobs(user):
 
         # Parse the lines into a list of dictionaries
         jobs = [dict(zip(keys, line.split())) for line in lines]
+        if len(jobs) == 1:
+            if len(jobs[0]) == 0:
+                print("No jobs found")
+                jobs = []
 
         return jobs
         # Write the jobs data to a JSON file
