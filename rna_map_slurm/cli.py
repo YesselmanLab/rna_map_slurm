@@ -25,10 +25,7 @@ from rna_map_slurm.generate_job import (
     generate_join_int_demultiplex_jobs,
 )
 from rna_map_slurm.jobs import get_user_jobs
-from rna_map_slurm.run_celery import write_celery_config_py_file
-from rna_map_slurm.tasks import master_task
 
-from celery import result
 
 log = get_logger(__name__)
 
@@ -209,38 +206,6 @@ def run():
     log.info("All jobs are completed")
 
             
-@cli.command()
-def setup_celery():
-    setup_logging()
-    output = subprocess.run("hostname -I", shell=True, capture_output=True, text=True)
-    hostname = output.stdout.split()[0]
-    log.info(f"Hostname: {hostname}")
-    write_celery_config_py_file(hostname)
-
-
-@cli.command()
-def run_celery():
-    setup_logging()
-    tasks = []
-    result = master_task.delay({})
-    print(f"Master task submitted with ID: {result.id}")
-
-    # Poll for the result until all tasks are completed
-    while not result.ready():
-        print("Waiting for tasks to complete...")
-        print(result.state)
-        print(result.status)
-        time.sleep(5)  # Adjust the polling interval as needed
-
-    print(result.state)
-    print(result.status)
-    print(result)
-
-    # Get the results once all tasks are complete
-    results = result.get()
-    print("All tasks completed. Results:", results)
-    
-
 @cli.command()
 @click.argument("run_name")
 def get_data_csv(run_name):
