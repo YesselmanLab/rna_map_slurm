@@ -1,8 +1,6 @@
 import os
 import subprocess
 import pandas as pd
-import logging
-from typing import Dict
 from tabulate import tabulate
 
 from rna_map_slurm.fastq import PairedFastqFiles

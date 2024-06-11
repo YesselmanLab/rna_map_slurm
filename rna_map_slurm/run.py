@@ -31,6 +31,8 @@ from rna_map_slurm.fastq import PairedFastqFiles, FastqFile, get_paired_fastqs
 from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.plotting import plot_pop_avg_from_row
 from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_directory
+from steps import split_fastq_file
+from steps import demultiplex as demultiplex_step
 
 log = get_logger("cli")
 
@@ -106,23 +108,14 @@ def split_fastqs(r1_path, r2_path, output_dir, num_chunks, start, threads):
     Split the input FASTQ files into multiple chunks.
 
     Arguments:
-
         r1_path (str): Path to the input R1 FASTQ file.
-
         r2_path (str): Path to the input R2 FASTQ file.
-
         output_dir (str): Path to the output directory where the split FASTQ files will be saved.
-
         num_chunks (int): Number of chunks to split the FASTQ files into.
     """
     setup_logging()
-    r1_output_files = []
-    r2_output_files = []
-    for i in range(start, num_chunks + start):
-        r1_output_files.append(f"{output_dir}/split-{i:04}/test_R1.fastq.gz")
-        r2_output_files.append(f"{output_dir}/split-{i:04}/test_R2.fastq.gz")
-    fastqsplitter(r1_path, r1_output_files, threads_per_file=threads)
-    fastqsplitter(r2_path, r2_output_files, threads_per_file=threads)
+    split_fastq_file(r1_path, output_dir, num_chunks, start, threads)
+    split_fastq_file(r2_path, output_dir, num_chunks, start, threads)
 
 
 @cli.command()
@@ -134,13 +127,7 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
     """
     demultiplexes paired fastq files given 3' end barcodes
     """
-    setup_logging(file_name="demultiplex.log")
-    if output_dir is None:
-        output_dir = os.getcwd()
-    paired_fastqs = PairedFastqFiles(FastqFile(r1_path), FastqFile(r2_path))
-    df = pd.read_csv(csv)
-    demultiplexer = SabreDemultiplexer()
-    demultiplexer.run(df, paired_fastqs, output_dir)
+    demultiplex_step(csv, r1_path, r2_path, output_dir)
 
 
 # combine rna-map results ############################################################
