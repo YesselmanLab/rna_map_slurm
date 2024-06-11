@@ -33,7 +33,7 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
     demultiplexer = SabreDemultiplexer()
     demultiplexer.run(df, paired_fastqs, output_dir)
     output_dirs = []
-    for df_row in df.iterrows():
+    for i, df_row in df.iterrows():
         output_dirs.append(f"{output_dir}/{df_row['barcode_seq']}")
     return output_dirs
 
