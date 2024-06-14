@@ -31,8 +31,8 @@ from rna_map_slurm.fastq import PairedFastqFiles, FastqFile, get_paired_fastqs
 from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.plotting import plot_pop_avg_from_row
 from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_directory
-from steps import split_fastq_file
-from steps import demultiplex as demultiplex_step
+from rna_map_slurm.steps import split_fastq_file
+from rna_map_slurm.steps import demultiplex as demultiplex_step
 
 log = get_logger("cli")
 
