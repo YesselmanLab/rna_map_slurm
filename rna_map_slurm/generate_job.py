@@ -3,12 +3,35 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict
 
+from seq_tools.sequence import get_reverse_complement
+
 from rna_map_slurm.logger import get_logger
 from rna_map_slurm.jobs import SlurmOptions, get_job_header, generate_submit_file
 from rna_map_slurm.fastq import get_paired_fastqs, PairedFastqFiles
 
 log = get_logger(__name__)
 
+
+def split_into_n(df, n):
+    """
+    Split a list into n sublists with sizes as close to equal as possible.
+    
+    Args:
+    - lst (pd.dataframe): The list to be split.
+    - n (int): The number of sublists.
+    
+    Returns:
+    - list of dataframe: The split sublists.
+    """
+    avg = len(df) // n
+    remainder = len(df) % n
+    result = []
+    idx = 0
+    for i in range(n):
+        size = avg + (1 if i < remainder else 0)
+        result.append(df[idx:idx+size].copy())
+        idx += size
+    return result
 
 ################################################################################
 ############################ Use everytime function ############################
@@ -247,6 +270,50 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
         "submits/README_INTERNAL_DEMULTIPLEXING", df_jobs["job_path"].tolist()
     )
     return df_jobs
+
+def generate_internal_demultiplex_single_barcode(params):
+    os.makedirs("jobs/int-demultiplex-sb", exist_ok=True)
+    cur_dir = os.path.abspath(os.getcwd())
+    df = pd.read_csv("data.csv")
+    slurm_params = SlurmOptions("int-demultiplex-sb") #TODO fill in later
+    runs_per_job = params["tasks_per_job"]["internal_demultiplex"] 
+    add_dfs = []
+    for _, row in df.iterrows():
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        df_barcodes = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
+        df_barcodes["construct_barcode"] = row["barcode_seq"]
+        add_dfs.append(df_barcodes)
+    df_barcodes = pd.concat(add_dfs)
+    jobs = []
+    dfs = split_into_n(df_barcodes, 500)
+    for i, df in enumerate(dfs):
+        name = f"int-demultiplex-sb-{i:04}"
+        slurm_params = SlurmOptions(name)
+        job_header = get_job_header(
+            slurm_params, os.path.abspath("jobs/int-demultiplex-sb/")
+        )
+        job_body = ""
+        for full_barcode, group in df.groupby("full_barcode"):
+            row = group.iloc[0]
+            bb1 = row["barcode_bounds"][0][0]
+            bb2 = row["barcode_bounds"][0][1]
+            end_len = len(row['sequence'])
+            max_len = end_len - bb2[0]
+            min_len = end_len - bb2[1]
+            bb2 = [min_len, max_len]
+            b1_seq = row['barcodes'][0][0]
+            b2_seq = get_reverse_complement(row['barcodes'][0][1])
+            job_body += (
+                f"rna-map-slurm-runner int-demultiplex-single-barcode {row['construct_barcode']} "
+                f"{b1_seq} {b2_seq} {bb1[0]} {bb1[1]} {bb2[0]} {bb2[1]}\n\n"
+            )
+        job = job_header + job_body
+        f = open(f"jobs/int-demultiplex-sb/{name}.sh", "w")
+        f.write(job)
+        f.close()
+        jobs.append(f"jobs/int-demultiplex-sb/{name}.sh")
+    generate_submit_file("submits/README_INTERNAL_DEMULTIPLEXING_SB", jobs)
 
 
 def generate_join_int_demultiplex_jobs(params):

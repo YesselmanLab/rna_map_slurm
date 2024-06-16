@@ -23,6 +23,7 @@ from rna_map_slurm.generate_job import (
     generate_rna_map_combine_jobs,
     generate_internal_demultiplex_jobs,
     generate_join_int_demultiplex_jobs,
+    generate_internal_demultiplex_single_barcode
 )
 from rna_map_slurm.jobs import get_user_jobs
 
@@ -154,6 +155,7 @@ def cli():
 # TODO need a way to check to see if existing jobs have been run
 @cli.command()
 def run():
+    start_time = time.time()
     setup_logging(file_name="run.log")
     #user_jobs = get_user_jobs("jyesselm")
     df = pd.read_csv("jobs.csv")
@@ -204,6 +206,9 @@ def run():
             log.info("All jobs are submitted")
             break
     log.info("All jobs are completed")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    log.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
             
 @cli.command()
@@ -290,6 +295,7 @@ def setup(data_csv, data_dirs, param_file):
     if num_int_demult > 0:
         df_jobs.append(generate_internal_demultiplex_jobs(params, num_dirs))
         df_jobs.append(generate_join_int_demultiplex_jobs(params))
+        df_jobs.append(generate_internal_demultiplex_single_barcode(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 

@@ -255,6 +255,35 @@ def int_demultiplex(fastq_dir, output_dir):
 
 
 @cli.command()
+@click.argument("construct_barcode")
+@click.argument("b1_seq")
+@click.argument("b2_seq")
+@click.argument("b1_min_pos", type=int)
+@click.argument("b1_max_pos", type=int)
+@click.argument("b2_min_pos", type=int)
+@click.argument("b2_max_pos", type=int)
+def int_demultiplex_single_barcode(
+    construct_barcode, b1_seq, b2_seq, b1_min_pos, b1_max_pos, b2_min_pos, b2_max_pos
+):
+    setup_logging()
+    tmp_dir =  "/scratch/" + random_string(10)
+    print(tmp_dir)
+    os.makedirs(tmp_dir, exist_ok=True)
+    r2_path = f"demultiplexed//{construct_barcode}/test_R2.fastq.gz"
+    r1_path = f"demultiplexed//{construct_barcode}/test_R1.fastq.gz"
+    os.system(f"seqkit grep -s -p \"{b1_seq}\" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz")
+    print(f"seqkit grep -s -p \"{b1_seq}\" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz")
+    os.system(f"seqkit grep -s -p \"{b2_seq}\" -P -R {b2_min_pos-2}:{b2_max_pos+2} {r1_path} -o {tmp_dir}/test_R1.fastq.gz")
+    os.system(f"seqkit seq -n {tmp_dir}/test_R2.fastq.gz > {tmp_dir}/R2_names.txt")
+    os.system(f"seqkit seq -n {tmp_dir}/test_R1.fastq.gz > {tmp_dir}/R1_names.txt")
+    os.system(f"sort {tmp_dir}/R1_names.txt > {tmp_dir}/R1_names_sorted.txt")
+    os.system(f"sort {tmp_dir}/R2_names.txt > {tmp_dir}/R2_names_sorted.txt")
+    cmd = "awk 'NR==FNR{a[$1]; next} $1 in a' " +f"{tmp_dir}/R1_names_sorted.txt {tmp_dir}/R2_names_sorted.txt "+ "| awk '{print($1)}' >" + f"{tmp_dir}/common_names.txt"
+    os.system(cmd)
+    os.system(f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz")
+    os.system(f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz")
+
+@cli.command()
 @click.argument("home_dir", type=click.Path(exists=True))
 @click.argument("barcode_seq")
 @click.option("--threads", default=1)
@@ -284,7 +313,7 @@ def join_int_demultiplex(home_dir, barcode_seq, threads, tmp_dir):
             f"{full_barcode}_mate2.fastq.gz",
         ]
 
-    outdir = f"{home_dir}/joined_fastqs/{barcode_seq}"
+    outdir = f"{home_dir}/int_demultiplexed/{barcode_seq}"
     os.makedirs(outdir, exist_ok=True)
     tmp_dir = tmp_dir + "/" + random_string(10)
     os.makedirs(tmp_dir, exist_ok=True)
@@ -315,7 +344,7 @@ def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp
     if tmp_dir is None:
         tmp_dir = os.getcwd()
     # get fastq files
-    fastq_dir = f"{home_dir}/joined_fastqs/{lib_barcode_seq}"
+    fastq_dir = f"{home_dir}/int_demultiplexed/{lib_barcode_seq}"
     log.info(fastq_dir)
     log.info(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")
     mate_1_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")[0]
