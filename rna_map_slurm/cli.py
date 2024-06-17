@@ -23,7 +23,8 @@ from rna_map_slurm.generate_job import (
     generate_rna_map_combine_jobs,
     generate_internal_demultiplex_jobs,
     generate_join_int_demultiplex_jobs,
-    generate_internal_demultiplex_single_barcode
+    generate_internal_demultiplex_single_barcode,
+    generate_rna_map_single_barcode_jobs
 )
 from rna_map_slurm.jobs import get_user_jobs
 
@@ -296,6 +297,7 @@ def setup(data_csv, data_dirs, param_file):
         df_jobs.append(generate_internal_demultiplex_jobs(params, num_dirs))
         df_jobs.append(generate_join_int_demultiplex_jobs(params))
         df_jobs.append(generate_internal_demultiplex_single_barcode(params))
+        df_jobs.append(generate_rna_map_single_barcode_jobs(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 

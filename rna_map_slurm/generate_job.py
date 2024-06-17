@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict
 
-from seq_tools.sequence import get_reverse_complement
 
 from rna_map_slurm.logger import get_logger
 from rna_map_slurm.jobs import SlurmOptions, get_job_header, generate_submit_file
@@ -33,43 +32,90 @@ def split_into_n(df, n):
         idx += size
     return result
 
+# Utility function to create job header
+def create_job_header(name: str, slurm_params: Dict, path: str) -> str:
+    """
+    Generates the SLURM job header using the provided parameters.
+
+    Parameters:
+    name (str): The name of the SLURM job.
+    slurm_params (Dict): Dictionary containing SLURM parameters such as time, memory 
+    per CPU, and CPUs per task.
+    path (str): The directory path where the job header will be used.
+
+    Returns:
+    str: The formatted SLURM job header.
+    """
+    slurm_opts = SlurmOptions(
+        name,
+        slurm_params["time"],
+        slurm_params["mem-per-cpu"],
+        slurm_params["cpus-per-task"],
+        slurm_params.get("extra_header_cmds", "")
+    )
+    return get_job_header(slurm_opts, os.path.abspath(path))
+
+
+# Utility function to write job file
+def write_job_file(path: str, job_name: str, job_content: str) -> None:
+    """
+    Writes the job content to a specified file.
+
+    Parameters:
+    path (str): The directory path where the job file will be created.
+    job_name (str): The name of the job file.
+    job_content (str): The content of the job script to be written into the file.
+
+    Returns:
+    None
+    """
+    with open(f"{path}/{job_name}.sh", "w") as f:
+        f.write(job_content)
+
+
+# Utility function to generate job list DataFrame
+def generate_job_list(path: str, job_type: str, requirement: str, job_names: List[str]) -> pd.DataFrame:
+    """
+    Generates a DataFrame containing the job list details.
+
+    Parameters:
+    path (str): The directory path where the job files are located.
+    job_type (str): The type of the job.
+    requirement (str): The job requirement (dependency).
+    job_names (List[str]): List of job file names.
+
+    Returns:
+    pd.DataFrame: DataFrame containing job details with columns
+      ['job_path', 'job_type', 'job_requirement'].
+    """
+    jobs = [[f"{path}/{name}.sh", job_type, requirement] for name in job_names]
+    return pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
+
 ################################################################################
 ############################ Use everytime function ############################
 ################################################################################
 
 
-# TODO split into two jobs for each pair of fastq files
-def generate_split_fastq_jobs(
-    pfqs: List[PairedFastqFiles], params: Dict
-) -> pd.DataFrame:
+def generate_split_fastq_jobs(pfqs: List[PairedFastqFiles], params: Dict) -> pd.DataFrame:
     os.makedirs("jobs/split-fastq", exist_ok=True)
-    # generate jobs
     cur_dir = os.path.abspath(os.getcwd())
     slurm_params = params["slurm_options"]["split_fastq"]
-    jobs = []
+    job_names = []
+
     for i, pfq in enumerate(pfqs):
         name = f"split-fastq-{i:04}"
-        slurm_opts = SlurmOptions(
-            name,
-            slurm_params["time"],
-            slurm_params["mem-per-cpu"],
-            slurm_params["cpus-per-task"],
-            params["slurm_options"]["extra_header_cmds"],
-        )
-        job_header = get_job_header(slurm_opts, os.path.abspath("jobs/split-fastq/"))
+        job_header = create_job_header(name, slurm_params, "jobs/split-fastq")
         job_body = (
             f"rna-map-slurm-runner split-fastqs {pfq.read_1.path} {pfq.read_2.path} "
-            f"{cur_dir + '/data'} {params['fastq_chunks']} --start "
-            f"{i*params['fastq_chunks']}\n"
+            f"{cur_dir + '/data'} {params['fastq_chunks']} --start {i * params['fastq_chunks']}\n"
         )
-        job = job_header + job_body
-        f = open(f"jobs/split-fastq/{name}.sh", "w")
-        f.write(job)
-        f.close()
-        jobs.append([f"jobs/split-fastq/{name}.sh", "split-fastq", ""])
-    df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
+        write_job_file("jobs/split-fastq", name, job_header + job_body)
+        job_names.append(name)
+
+    df_jobs = generate_job_list("jobs/split-fastq", "split-fastq", "", job_names)
     generate_submit_file("submits/README_SPLIT_FASTQ", df_jobs["job_path"].tolist())
     return df_jobs
+
 
 
 def generate_demultiplexing_jobs(params, num_dirs):
@@ -271,6 +317,7 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
     )
     return df_jobs
 
+
 def generate_internal_demultiplex_single_barcode(params):
     os.makedirs("jobs/int-demultiplex-sb", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
@@ -303,7 +350,7 @@ def generate_internal_demultiplex_single_barcode(params):
             min_len = end_len - bb2[1]
             bb2 = [min_len, max_len]
             b1_seq = row['barcodes'][0][0]
-            b2_seq = get_reverse_complement(row['barcodes'][0][1])
+            b2_seq = row['barcodes'][0][1]
             job_body += (
                 f"rna-map-slurm-runner int-demultiplex-single-barcode {row['construct_barcode']} "
                 f"{b1_seq} {b2_seq} {bb1[0]} {bb1[1]} {bb2[0]} {bb2[1]}\n\n"
@@ -351,6 +398,7 @@ def generate_join_int_demultiplex_jobs(params):
 
 
 def generate_rna_map_single_barcode_jobs(params):
+    os.makedirs("jobs/rna-map-single-barcode", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["rna_map_single_barcode"]
@@ -363,7 +411,7 @@ def generate_rna_map_single_barcode_jobs(params):
             continue
         os.makedirs(f"rna_map/{row['barcode_seq']}", exist_ok=True)
         df_barcode = pd.read_json(
-            f"{params['input_dir']}/barcode_jsons/{row['code']}.json"
+            f"inputs/barcode_jsons/{row['code']}.json"
         )
         unique_barcodes = df_barcode["full_barcode"].unique()
         for barcode in unique_barcodes:
