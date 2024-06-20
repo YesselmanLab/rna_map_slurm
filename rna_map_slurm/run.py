@@ -16,7 +16,7 @@ from seq_tools.dataframe import to_fasta, to_dna
 from seq_tools.sequence import get_reverse_complement
 
 from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
-
+import rna_map
 from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
     get_mut_histos_from_pickle_file,
@@ -128,6 +128,7 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
     demultiplexes paired fastq files given 3' end barcodes
     """
     demultiplex_task(csv, r1_path, r2_path, output_dir)
+
 
 def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
     params = get_preset_params("barcoded-library")
