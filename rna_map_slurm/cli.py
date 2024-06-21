@@ -8,6 +8,7 @@ import glob
 import zipfile
 import time
 import subprocess
+import yaml
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
@@ -24,7 +25,7 @@ from rna_map_slurm.generate_job import (
     generate_internal_demultiplex_jobs,
     generate_join_int_demultiplex_jobs,
     generate_internal_demultiplex_single_barcode,
-    generate_rna_map_single_barcode_jobs
+    generate_rna_map_single_barcode_jobs,
 )
 from rna_map_slurm.jobs import get_user_jobs
 
@@ -131,7 +132,7 @@ def submit_jobs(df):
 
 
 # TODO need to update this so can use sacct
-# need to record which just has which id 
+# need to record which just has which id
 def is_job_type_completed(job_type, jobs):
     """
     Check if a specific job type is completed. the job_type should be a substring of the job name
@@ -148,25 +149,27 @@ def is_job_type_completed(job_type, jobs):
         if job_type in job["Name"]:
             return False
     return True
-              
+
+
 @click.group()
 def cli():
     pass
+
 
 # TODO need a way to check to see if existing jobs have been run
 @cli.command()
 def run():
     start_time = time.time()
     setup_logging(file_name="run.log")
-    #user_jobs = get_user_jobs("jyesselm")
+    # user_jobs = get_user_jobs("jyesselm")
     df = pd.read_csv("jobs.csv")
     df["status"] = "not_started"
-    df_can_run = df[df['job_requirement'].isna()]
-    df.loc[ df['job_requirement'].isna(), "status"] = "run"
-    completed_types = [] 
+    df_can_run = df[df["job_requirement"].isna()]
+    df.loc[df["job_requirement"].isna(), "status"] = "run"
+    completed_types = []
     submitted_types = df_can_run["job_type"].to_list()
     submit_jobs(df_can_run)
-    while True:        
+    while True:
         # Wait for the submitted jobs to finish
         time.sleep(60)
         jobs = get_user_jobs("jyesselm")
@@ -180,8 +183,10 @@ def run():
         for job_type in completed_types:
             if job_type in submitted_types:
                 submitted_types.remove(job_type)
-        
-        df_not_run = df[(~df["job_type"].isin(completed_types)) & (df["status"] == "not_started")]
+
+        df_not_run = df[
+            (~df["job_type"].isin(completed_types)) & (df["status"] == "not_started")
+        ]
         submitted = False
         for job_type, g in df_not_run.groupby("job_type"):
             requirement = g["job_requirement"].iloc[0]
@@ -211,7 +216,7 @@ def run():
     elapsed_time = end_time - start_time
     log.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
-            
+
 @cli.command()
 @click.argument("run_name")
 def get_data_csv(run_name):
@@ -224,12 +229,16 @@ def get_data_csv(run_name):
     df.to_csv("data.csv", index=False)
 
 
+# TODO output params file
 @cli.command()
 @click.argument("data_csv")
 @click.argument("data_dirs", nargs=-1)
 @click.option("--param-file", type=click.Path(exists=True), default=None)
 def setup(data_csv, data_dirs, param_file):
-    setup_logging(file_name="setup.log")
+    os.makedirs("logs", exist_ok=True)
+    if os.path.isfile("logs/setup.log"):
+        os.remove("logs/setup.log")
+    setup_logging(file_name="logs/setup.log")
     df = pd.read_csv(data_csv)
     if param_file is not None:
         log.info(f"Reading param file: {param_file}")
@@ -237,6 +246,7 @@ def setup(data_csv, data_dirs, param_file):
     else:
         log.info("Using default parameters")
         params = get_default_parameters()
+    yaml.dump(params, open("logs/params.yaml", "w"))
     log.info("\n" + json.dumps(params, indent=4))
     log.info(f"data.csv has {len(df)} constructs")
     log.info("Setting up run")

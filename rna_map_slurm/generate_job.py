@@ -8,17 +8,17 @@ from rna_map_slurm.logger import get_logger
 from rna_map_slurm.jobs import SlurmOptions, get_job_header, generate_submit_file
 from rna_map_slurm.fastq import get_paired_fastqs, PairedFastqFiles
 
-log = get_logger(__name__)
+log = get_logger("GENERATE-JOBS")
 
 
 def split_into_n(df, n):
     """
     Split a list into n sublists with sizes as close to equal as possible.
-    
+
     Args:
     - lst (pd.dataframe): The list to be split.
     - n (int): The number of sublists.
-    
+
     Returns:
     - list of dataframe: The split sublists.
     """
@@ -28,35 +28,51 @@ def split_into_n(df, n):
     idx = 0
     for i in range(n):
         size = avg + (1 if i < remainder else 0)
-        result.append(df[idx:idx+size].copy())
+        result.append(df[idx : idx + size].copy())
         idx += size
     return result
 
-# Utility function to create job header
-def create_job_header(name: str, slurm_params: Dict, path: str) -> str:
+
+def create_job_header(
+    name: str, slurm_params: Dict, extra_header_cmds: str, path: str
+) -> str:
     """
     Generates the SLURM job header using the provided parameters.
 
-    Parameters:
-    name (str): The name of the SLURM job.
-    slurm_params (Dict): Dictionary containing SLURM parameters such as time, memory 
-    per CPU, and CPUs per task.
-    path (str): The directory path where the job header will be used.
+    Args:
+        name (str): The name of the SLURM job.
+        slurm_params (Dict): Dictionary containing SLURM parameters such as time, memory
+            per CPU, and CPUs per task.
+        extra_header_cmds (str): Additional header commands to be included in the job header.
+        path (str): The directory path where the job header will be used.
 
     Returns:
-    str: The formatted SLURM job header.
+        str: The formatted SLURM job header.
+
+    Raises:
+        None
+
+    Examples:
+        >>> slurm_params = {
+        ...     "time": "00:10:00",
+        ...     "mem-per-cpu": "2G",
+        ...     "cpus-per-task": 4
+        ... }
+        >>> extra_header_cmds = "#SBATCH --constraint=skylake"
+        >>> path = "/path/to/job"
+        >>> create_job_header("my_job", slurm_params, extra_header_cmds, path)
+        '#SBATCH --job-name=my_job\\n#SBATCH --time=00:10:00\\n#SBATCH --mem-per-cpu=2G\\n#SBATCH --cpus-per-task=4\\n#SBATCH --constraint=skylake\\n'
     """
     slurm_opts = SlurmOptions(
         name,
         slurm_params["time"],
         slurm_params["mem-per-cpu"],
         slurm_params["cpus-per-task"],
-        slurm_params.get("extra_header_cmds", "")
+        extra_header_cmds,
     )
     return get_job_header(slurm_opts, os.path.abspath(path))
 
 
-# Utility function to write job file
 def write_job_file(path: str, job_name: str, job_content: str) -> None:
     """
     Writes the job content to a specified file.
@@ -73,8 +89,9 @@ def write_job_file(path: str, job_name: str, job_content: str) -> None:
         f.write(job_content)
 
 
-# Utility function to generate job list DataFrame
-def generate_job_list(path: str, job_type: str, requirement: str, job_names: List[str]) -> pd.DataFrame:
+def generate_job_list(
+    path: str, job_type: str, requirement: str, job_names: List[str]
+) -> pd.DataFrame:
     """
     Generates a DataFrame containing the job list details.
 
@@ -91,23 +108,38 @@ def generate_job_list(path: str, job_type: str, requirement: str, job_names: Lis
     jobs = [[f"{path}/{name}.sh", job_type, requirement] for name in job_names]
     return pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
 
+
 ################################################################################
 ############################ Use everytime function ############################
 ################################################################################
 
 
-def generate_split_fastq_jobs(pfqs: List[PairedFastqFiles], params: Dict) -> pd.DataFrame:
+def generate_split_fastq_jobs(
+    pfqs: List[PairedFastqFiles], params: Dict
+) -> pd.DataFrame:
+    """
+    Generates SLURM job files for splitting FASTQ files and returns a DataFrame of job details.
+
+    Args:
+        pfqs (List[PairedFastqFiles]): List of paired FASTQ files.
+        params (Dict): Parameters for the SLURM job and FASTQ splitting.
+
+    Returns:
+        pd.DataFrame: DataFrame containing job details.
+    """
     os.makedirs("jobs/split-fastq", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     slurm_params = params["slurm_options"]["split_fastq"]
+    extra_header_cmds = params["slurm_options"]["extra_header_cmds"]
     job_names = []
-
     for i, pfq in enumerate(pfqs):
         name = f"split-fastq-{i:04}"
-        job_header = create_job_header(name, slurm_params, "jobs/split-fastq")
+        job_header = create_job_header(
+            name, slurm_params, extra_header_cmds, "jobs/split-fastq"
+        )
         job_body = (
             f"rna-map-slurm-runner split-fastqs {pfq.read_1.path} {pfq.read_2.path} "
-            f"{cur_dir + '/data'} {params['fastq_chunks']} --start {i * params['fastq_chunks']}\n"
+            f"{os.path.join(cur_dir, 'data')} {params['fastq_chunks']} --start {i * params['fastq_chunks']}\n"
         )
         write_job_file("jobs/split-fastq", name, job_header + job_body)
         job_names.append(name)
@@ -117,39 +149,42 @@ def generate_split_fastq_jobs(pfqs: List[PairedFastqFiles], params: Dict) -> pd.
     return df_jobs
 
 
+def generate_demultiplexing_jobs(params: Dict, num_dirs: int) -> pd.DataFrame:
+    """
+    Generates SLURM job files for demultiplexing and returns a DataFrame of job details.
 
-def generate_demultiplexing_jobs(params, num_dirs):
+    Args:
+        params (Dict): Parameters for the SLURM job and demultiplexing.
+        num_dirs (int): Number of directories to be processed.
+
+    Returns:
+        pd.DataFrame: DataFrame containing job details.
+    """
     os.makedirs("jobs/demultiplex", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     csv_path = os.path.abspath("data.csv")
     runs_per_job = params["tasks_per_job"]["demultiplex"]
-    dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
+    dirs = [f"data/split-{i:04}" for i in range(num_dirs)]
     slurm_params = params["slurm_options"]["demultiplex"]
+    extra_header_cmds = params["slurm_options"]["extra_header_cmds"]
     dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
     jobs = []
     for i, dg in enumerate(dir_groups):
         name = f"demultiplex-{i:04}"
-        slurm_opts = SlurmOptions(
-            name,
-            slurm_params["time"],
-            slurm_params["mem-per-cpu"],
-            slurm_params["cpus-per-task"],
-            params["slurm_options"]["extra_header_cmds"],
+        job_header = create_job_header(
+            name, slurm_params, extra_header_cmds, "jobs/demultiplex"
         )
-        job_header = get_job_header(slurm_opts, os.path.abspath("jobs/demultiplex/"))
-        job_body = ""
-        for d in dg:
-            job_body += (
+        job_body = "\n".join(
+            [
                 f"cd {cur_dir}/{d}\n"
-                f"rna-map-slurm-runner demultiplex {csv_path} test_R1.fastq.gz test_R2.fastq.gz\n"
-            )
-        job = job_header + job_body
-        f = open(f"jobs/demultiplex/{name}.sh", "w")
-        f.write(job)
-        f.close()
+                f"rna-map-slurm-runner demultiplex {csv_path} test_R1.fastq.gz test_R2.fastq.gz"
+                for d in dg
+            ]
+        )
+        write_job_file("jobs/demultiplex", name, job_header + job_body)
         jobs.append(
             [
-                f"jobs/demultiplex/demultiplex-{i:04}.sh",
+                os.path.join("jobs/demultiplex", f"{name}.sh"),
                 "demultiplex",
                 "split-fastq",
             ]
@@ -170,44 +205,36 @@ def generate_rna_map_jobs(params, num_dirs):
     df = pd.read_csv(csv_path)
     runs_per_job = params["tasks_per_job"]["rna_map"]
     slurm_params = params["slurm_options"]["rna_map"]
+    extra_header_cmds = params["slurm_options"]["extra_header_cmds"]
     dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
     dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
     count = 0
     jobs = []
-    # should not be necessary anymore but worth leaving
-    if "demult_cmd" not in df.columns:
-        df["demult_cmd"] = np.nan
-    for _, row in df.iterrows():
-        if not pd.isnull(row["demult_cmd"]):
-            continue
-        if row["exp_name"].lower().startswith("eich"):
-            continue
+    sub_df = df.query(
+        "demult_cmd.isnull() and not exp_name.str.lower().str.startswith('eich')"
+    )
+    for _, row in sub_df.iterrows():
         if not os.path.isfile(f"inputs/fastas/{row['code']}.fasta"):
             log.warning(f"{row['code']} does not have a RNA CSV file!!!")
             continue
         for dg in dir_groups:
             name = f"rna-map-{count:04}"
-            slurm_opts = SlurmOptions(
-                name,
-                slurm_params["time"],
-                slurm_params["mem-per-cpu"],
-                slurm_params["cpus-per-task"],
-                params["slurm_options"]["extra_header_cmds"],
+            job_header = create_job_header(
+                name, slurm_params, extra_header_cmds, "jobs/rna-map"
             )
-            job_header = get_job_header(slurm_opts, os.path.abspath("jobs/rna-map/"))
             job_body = ""
+            fa_path = os.path.abspath(f"{cur_dir}/inputs/fastas/{row['code']}.fasta")
+            dot_bracket_path = os.path.abspath(
+                f"{cur_dir}/inputs/rnas/{row['code']}.csv"
+            )
             for dir in dg:
-                os.makedirs(
-                    f"{cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}",
-                    exist_ok=True,
-                )
+                output_dir = f"{cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}"
+                os.makedirs(output_dir, exist_ok=True)
+                fq1_path = os.path.abspath(f"{cur_dir}/{dir}/test_R1.fastq.gz")
+                fq2_path = os.path.abspath(f"{cur_dir}/{dir}/test_R2.fastq.gz")
                 job_body += (
                     f"cd {cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}\n"
-                    f"rna-map -fa {cur_dir}/inputs/fastas/{row['code']}.fasta "
-                    f"-fq1 ../test_R1.fastq.gz -fq2 ../test_R2.fastq.gz "
-                    f"--dot-bracket {cur_dir}/inputs/rnas/{row['code']}.csv "
-                    f"--summary-output-only --param-preset barcoded-library\n"
-                    f"rm -rf log input output/Mapping_Files\n"
+                    f"rna-map-slurm-runner run-rna-map {fa_path} {fq1_path} {fq2_path} {dot_bracket_path} {output_dir}\n\n"
                 )
             job = job_header + job_body
             f = open(f"jobs/rna-map/{name}.sh", "w")
@@ -220,41 +247,35 @@ def generate_rna_map_jobs(params, num_dirs):
     return df_jobs
 
 
-def generate_rna_map_combine_jobs(params):
+def generate_rna_map_combine_jobs(params: Dict) -> pd.DataFrame:
+    """
+    Generates SLURM job files for combining RNA map results and returns a DataFrame of job details.
+
+    Args:
+        params (Dict): Parameters for the SLURM job and RNA mapping combining.
+
+    Returns:
+        pd.DataFrame: DataFrame containing job details.
+    """
     os.makedirs("jobs/rna-map-combine", exist_ok=True)
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["rna_map_combine"]
+    extra_header_cmds = params["slurm_options"]["extra_header_cmds"]
     jobs = []
-    if "demult_cmd" not in df.columns:
-        df["demult_cmd"] = np.nan
     for i, row in df.iterrows():
         name = f"rna-map-combine-{i:04}"
-        slurm_opts = SlurmOptions(
-            name,
-            slurm_params["time"],
-            slurm_params["mem-per-cpu"],
-            slurm_params["cpus-per-task"],
-            params["slurm_options"]["extra_header_cmds"],
+        job_header = create_job_header(
+            name, slurm_params, extra_header_cmds, "jobs/rna-map-combine/"
         )
-        job_header = get_job_header(
-            slurm_opts, os.path.abspath("jobs/rna-map-combine/")
-        )
-        if not pd.isnull(row["demult_cmd"]):
-            continue
-        if row["exp_name"].lower().startswith("eich"):
+        if not pd.isnull(row["demult_cmd"]) or row["exp_name"].lower().startswith(
+            "eich"
+        ):
             continue
         job_body = f"rna-map-slurm-runner combine-rna-map {row['barcode_seq']} {row['construct']}\n"
         job = job_header + job_body
-        f = open(f"jobs/rna-map-combine/{name}.sh", "w")
-        f.write(job)
-        f.close()
-        jobs.append(
-            [
-                f"jobs/rna-map-combine/{name}.sh",
-                "rna-map-combine",
-                "rna-map",
-            ]
-        )
+        with open(f"jobs/rna-map-combine/{name}.sh", "w") as f:
+            f.write(job)
+        jobs.append([f"jobs/rna-map-combine/{name}.sh", "rna-map-combine", "rna-map"])
     df_jobs = pd.DataFrame(jobs, columns=["job_path", "job_type", "job_requirement"])
     generate_submit_file("submits/README_RNA_MAP_COMBINE", df_jobs["job_path"].tolist())
     return df_jobs
@@ -271,26 +292,18 @@ def generate_internal_demultiplex_jobs(params, num_dirs):
     df = pd.read_csv("data.csv")
     slurm_params = params["slurm_options"]["internal_demultiplex"]
     runs_per_job = params["tasks_per_job"]["internal_demultiplex"]
+    extra_header_cmds = params["slurm_options"]["extra_header_cmds"]
     dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
     jobs = []
     i = 0
     dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
-    if "demult_cmd" not in df.columns:
-        df["demult_cmd"] = np.nan
     for _, row in df.iterrows():
         if pd.isnull(row["demult_cmd"]):
             continue
         for dg in dir_groups:
             name = f"int-demultiplex-{i:04}"
-            slurm_opts = SlurmOptions(
-                name,
-                slurm_params["time"],
-                slurm_params["mem-per-cpu"],
-                slurm_params["cpus-per-task"],
-                params["slurm_options"]["extra_header_cmds"],
-            )
-            job_header = get_job_header(
-                slurm_opts, os.path.abspath("jobs/int-demultiplex/")
+            job_header = create_job_header(
+                name, slurm_params, extra_header_cmds, "jobs/int-demultiplex/"
             )
             job_body = ""
             for dir in dg:
@@ -322,8 +335,8 @@ def generate_internal_demultiplex_single_barcode(params):
     os.makedirs("jobs/int-demultiplex-sb", exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv("data.csv")
-    slurm_params = SlurmOptions("int-demultiplex-sb") #TODO fill in later
-    runs_per_job = params["tasks_per_job"]["internal_demultiplex"] 
+    slurm_params = SlurmOptions("int-demultiplex-sb")  # TODO fill in later
+    runs_per_job = params["tasks_per_job"]["internal_demultiplex"]
     add_dfs = []
     for _, row in df.iterrows():
         if pd.isnull(row["demult_cmd"]):
@@ -345,12 +358,12 @@ def generate_internal_demultiplex_single_barcode(params):
             row = group.iloc[0]
             bb1 = row["barcode_bounds"][0][0]
             bb2 = row["barcode_bounds"][0][1]
-            end_len = len(row['sequence'])
+            end_len = len(row["sequence"])
             max_len = end_len - bb2[0]
             min_len = end_len - bb2[1]
             bb2 = [min_len, max_len]
-            b1_seq = row['barcodes'][0][0]
-            b2_seq = row['barcodes'][0][1]
+            b1_seq = row["barcodes"][0][0]
+            b2_seq = row["barcodes"][0][1]
             job_body += (
                 f"rna-map-slurm-runner int-demultiplex-single-barcode {row['construct_barcode']} "
                 f"{b1_seq} {b2_seq} {bb1[0]} {bb1[1]} {bb2[0]} {bb2[1]}\n\n"
@@ -410,9 +423,7 @@ def generate_rna_map_single_barcode_jobs(params):
         if pd.isnull(row["demult_cmd"]):
             continue
         os.makedirs(f"rna_map/{row['barcode_seq']}", exist_ok=True)
-        df_barcode = pd.read_json(
-            f"inputs/barcode_jsons/{row['code']}.json"
-        )
+        df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
         unique_barcodes = df_barcode["full_barcode"].unique()
         for barcode in unique_barcodes:
             runs.append([row["barcode_seq"], barcode])

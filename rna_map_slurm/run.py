@@ -25,7 +25,6 @@ from rna_map.mutation_histogram import (
 )
 from rna_map.parameters import get_preset_params
 
-
 from rna_map_slurm.logger import setup_logging, get_logger
 from rna_map_slurm.fastq import PairedFastqFiles, FastqFile, get_paired_fastqs
 from rna_map_slurm.demultiplex import SabreDemultiplexer
@@ -34,7 +33,6 @@ from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_direct
 from rna_map_slurm.tasks import split_fastq_file_task, demultiplex_task
 
 log = get_logger("cli")
-
 
 
 def combine_gzipped_fastq(input_files, output_file):
@@ -127,13 +125,27 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
     """
     demultiplexes paired fastq files given 3' end barcodes
     """
+    setup_logging()
     demultiplex_task(csv, r1_path, r2_path, output_dir)
 
 
+@cli.command()
+@click.argument("fasta_path", type=click.Path(exists=True))
+@click.argument("r1_path", type=click.Path(exists=True))
+@click.argument("r2_path", type=click.Path(exists=True))
+@click.argument("csv_path", type=click.Path(exists=True))
+@click.argument("output_dir", type=click.Path(exists=True))
 def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
+    setup_logging()
+    curdir = os.getcwd()
+    os.chdir(output_dir)
     params = get_preset_params("barcoded-library")
-    #rna_map.run.run(fasta_path, r1_path, r2_path, csv_path, params)
-    pass
+    rna_map.run.run(fasta_path, r1_path, r2_path, csv_path, params)
+    shutil.rmtree("log")
+    shutil.rmtree("input")
+    shutil.rmtree("output/Mapping_Files")
+    os.chdir(curdir)
+
 
 # combine rna-map results ############################################################
 # takes regular rna-map results and combines them into a mutation_histos.p
@@ -271,22 +283,36 @@ def int_demultiplex_single_barcode(
     construct_barcode, b1_seq, b2_seq, b1_min_pos, b1_max_pos, b2_min_pos, b2_max_pos
 ):
     setup_logging()
-    tmp_dir =  "/scratch/" + random_string(10)
+    tmp_dir = "/scratch/" + random_string(10)
     print(tmp_dir)
     os.makedirs(tmp_dir, exist_ok=True)
     r2_path = f"demultiplexed//{construct_barcode}/test_R2.fastq.gz"
     r1_path = f"demultiplexed//{construct_barcode}/test_R1.fastq.gz"
     b2_seq_rc = get_reverse_complement(b2_seq)
-    os.system(f"seqkit grep -s -p \"{b1_seq}\" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz")
-    os.system(f"seqkit grep -s -p \"{b2_seq_rc}\" -P -R {b2_min_pos-2}:{b2_max_pos+2} {r1_path} -o {tmp_dir}/test_R1.fastq.gz")
+    os.system(
+        f'seqkit grep -s -p "{b1_seq}" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz'
+    )
+    os.system(
+        f'seqkit grep -s -p "{b2_seq_rc}" -P -R {b2_min_pos-2}:{b2_max_pos+2} {r1_path} -o {tmp_dir}/test_R1.fastq.gz'
+    )
     os.system(f"seqkit seq -n {tmp_dir}/test_R2.fastq.gz > {tmp_dir}/R2_names.txt")
     os.system(f"seqkit seq -n {tmp_dir}/test_R1.fastq.gz > {tmp_dir}/R1_names.txt")
     os.system(f"sort {tmp_dir}/R1_names.txt > {tmp_dir}/R1_names_sorted.txt")
     os.system(f"sort {tmp_dir}/R2_names.txt > {tmp_dir}/R2_names_sorted.txt")
-    cmd = "awk 'NR==FNR{a[$1]; next} $1 in a' " +f"{tmp_dir}/R1_names_sorted.txt {tmp_dir}/R2_names_sorted.txt "+ "| awk '{print($1)}' >" + f"{tmp_dir}/common_names.txt"
+    cmd = (
+        "awk 'NR==FNR{a[$1]; next} $1 in a' "
+        + f"{tmp_dir}/R1_names_sorted.txt {tmp_dir}/R2_names_sorted.txt "
+        + "| awk '{print($1)}' >"
+        + f"{tmp_dir}/common_names.txt"
+    )
     os.system(cmd)
-    os.system(f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz")
-    os.system(f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz")
+    os.system(
+        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz"
+    )
+    os.system(
+        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
+    )
+
 
 @cli.command()
 @click.argument("home_dir", type=click.Path(exists=True))
@@ -378,7 +404,11 @@ def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp
     # run rna-map
     try:
         rna_map.run.run(
-            f"{tmp_dir}/test.fasta", mate_1_path, mate_2_path, f"{tmp_dir}/test.csv", params
+            f"{tmp_dir}/test.fasta",
+            mate_1_path,
+            mate_2_path,
+            f"{tmp_dir}/test.csv",
+            params,
         )
     except:
         log.error(f"rna-map failed for {construct_barcode_seq}")

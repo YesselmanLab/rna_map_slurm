@@ -1,6 +1,7 @@
 import os
 import subprocess
 import pandas as pd
+from typing import List
 from tabulate import tabulate
 
 from rna_map_slurm.fastq import PairedFastqFiles
@@ -15,16 +16,16 @@ class SabreDemultiplexer:
     ) -> None:
         """
         Run the demultiplexing process.
-        :param df: DataFrame containing barcode information
-        :param paired_fqs: PairedFastqFiles object containing paths to the FASTQ files
-        :param demultiplex_path: Path to the directory where demultiplexing should be performed
+
+        Args:
+            df (pd.DataFrame): DataFrame containing barcode information.
+            paired_fqs (PairedFastqFiles): PairedFastqFiles object containing paths to the FASTQ files.
+            demultiplex_path (str): Path to the directory where demultiplexing should be performed.
         """
         if not os.path.isdir(demultiplex_path):
             log.error(f"{demultiplex_path} does not exist")
             return
 
-        cur_dir = os.getcwd()
-        os.chdir(demultiplex_path)
         log.info("Preparing barcodes.txt file for demultiplexing")
         self._generate_barcode_file(df)
 
@@ -34,6 +35,7 @@ class SabreDemultiplexer:
             f"sabre pe -f {r1_path} -r {r2_path} -b barcode.txt "
             f"-u NC/test_R1.fastq -w NC/test_R2.fastq -m 4"
         )
+        log.info(f"Running sabre with command: {command}")
 
         try:
             output = subprocess.check_output(command, shell=True)
@@ -45,15 +47,16 @@ class SabreDemultiplexer:
 
         for _, row in df.iterrows():
             self._gzip_files(row["barcode_seq"])
-        os.chdir(cur_dir)
 
     def _generate_barcode_file(
         self, df: pd.DataFrame, fname: str = "barcode.txt"
     ) -> None:
         """
         Generate barcode file for sabre demultiplexing.
-        :param df: DataFrame containing barcode information
-        :param fname: Filename for the barcode file
+
+        Args:
+            df (pd.DataFrame): DataFrame containing barcode information.
+            fname (str): Filename for the barcode file.
         """
         expects = ["barcode", "barcode_seq", "construct"]
         self._check_if_columns_exist(df, expects)
@@ -93,7 +96,9 @@ class SabreDemultiplexer:
     def _gzip_files(self, barcode_seq: str) -> None:
         """
         Gzip the demultiplexed files for a given barcode sequence.
-        :param barcode_seq: Barcode sequence for which to gzip files
+
+        Args:
+            barcode_seq (str): Barcode sequence for which to gzip files.
         """
         try:
             subprocess.check_call(f"gzip {barcode_seq}/test_R1.fastq", shell=True)
@@ -102,11 +107,16 @@ class SabreDemultiplexer:
         except subprocess.CalledProcessError as e:
             log.error(f"Error gzipping files for barcode sequence {barcode_seq}: {e}")
 
-    def _check_if_columns_exist(self, df: pd.DataFrame, columns: list) -> None:
+    def _check_if_columns_exist(self, df: pd.DataFrame, columns: List[str]) -> None:
         """
         Check if required columns exist in the DataFrame.
-        :param df: DataFrame to check
-        :param columns: List of required column names
+
+        Args:
+            df (pd.DataFrame): DataFrame to check.
+            columns (List[str]): List of required column names.
+
+        Raises:
+            ValueError: If any required columns are missing from the DataFrame.
         """
         missing_columns = [col for col in columns if col not in df.columns]
         if missing_columns:
