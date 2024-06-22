@@ -6,7 +6,7 @@ tasks_per_job:
   trim-galore: 10
   join-fastq-files: 1
   rna-map: 25
-  internal-demultiplex: 10
+  int-demultiplex: 10
   int-demultiplex-rna-map: 25
 slurm_options:
   extra-header-cmds: "" 
