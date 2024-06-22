@@ -236,7 +236,6 @@ def generate_rna_map_jobs(params, num_dirs):
     dirs = [f"data/split-{i:04}" for i in range(0, num_dirs)]
     dir_groups = [dirs[i : i + runs_per_job] for i in range(0, len(dirs), runs_per_job)]
     job_names = []
-    cur_dir = os.path.abspath(os.getcwd())
     df = pd.read_csv(csv_path)
     sub_df = df.query(
         "demult_cmd.isnull() and not exp_name.str.lower().str.startswith('eich')"
@@ -252,15 +251,19 @@ def generate_rna_map_jobs(params, num_dirs):
                 name, slurm_params, extra_header_cmds, f"jobs/{job_name}"
             )
             job_body = ""
-            fa_path = os.path.abspath(f"{cur_dir}/inputs/fastas/{row['code']}.fasta")
-            dot_bracket_path = os.path.abspath(
-                f"{cur_dir}/inputs/rnas/{row['code']}.csv"
-            )
+            fa_path = os.path.abspath(f"inputs/fastas/{row['code']}.fasta")
+            dot_bracket_path = os.path.abspath(f"inputs/rnas/{row['code']}.csv")
             for dir in dg:
-                output_dir = f"{cur_dir}/{dir}/{row['barcode_seq']}/{row['construct']}"
+                output_dir = os.path.abspath(
+                    f"{dir}/{row['barcode_seq']}/{row['construct']}"
+                )
                 os.makedirs(output_dir, exist_ok=True)
-                fq1_path = os.path.abspath(f"{cur_dir}/{dir}/test_R1.fastq.gz")
-                fq2_path = os.path.abspath(f"{cur_dir}/{dir}/test_R2.fastq.gz")
+                fq1_path = os.path.abspath(
+                    f"{dir}/{row['barcode_seq']}/test_R1.fastq.gz"
+                )
+                fq2_path = os.path.abspath(
+                    f"{dir}/{row['barcode_seq']}test_R2.fastq.gz"
+                )
                 job_body += f"rna-map-slurm-runner run-rna-map {fa_path} {fq1_path} {fq2_path} {dot_bracket_path} {output_dir}\n\n"
             write_job_file(f"jobs/{job_name}", name, job_header + job_body)
             job_names.append(name)
@@ -373,7 +376,9 @@ def generate_int_demultiplex_jobs(params):
             )
         write_job_file(f"jobs/{job_name}", name, job_header + job_body)
         job_names.append(name)
-    df_jobs = generate_job_list(f"jobs/{job_name}", job_name, "join-fastq-files", job_names)
+    df_jobs = generate_job_list(
+        f"jobs/{job_name}", job_name, "join-fastq-files", job_names
+    )
     generate_submit_file(
         f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist()
     )

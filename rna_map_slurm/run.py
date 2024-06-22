@@ -227,9 +227,14 @@ def join_fastq_files():
         os.makedirs(f"demultiplexed/{barcode}", exist_ok=True)
         r1_files = glob.glob(f"data/*/{barcode}/test_R1.fastq.gz")
         r2_files = glob.glob(f"data/*/{barcode}/test_R2.fastq.gz")
+        log.info(f"joining {barcode} files")
+        log.info(f"r1_files: {len(r1_files)}")
+        log.info(f"outputing to: demultiplexed/{barcode}/test_R1.fastq.gz")
         os.system(
             f"cat {' '.join(r1_files)} > demultiplexed/{barcode}/test_R1.fastq.gz"
         )
+        log.info(f"r2_files: {len(r2_files)}")
+        log.info(f"outputing to: demultiplexed/{barcode}/test_R2.fastq.gz")
         os.system(
             f"cat {' '.join(r2_files)} > demultiplexed/{barcode}/test_R2.fastq.gz"
         )

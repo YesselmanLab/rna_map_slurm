@@ -35,7 +35,7 @@ slurm_options:
   join-fastq-files:
     time: "12:00:00"
     cpus-per-task: 1
-    mem-per-cpu: 2GB
+    mem-per-cpu: 4GB
   rna-map:
     time: "6:00:00"
     cpus-per-task: 1
