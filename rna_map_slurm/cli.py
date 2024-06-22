@@ -19,13 +19,13 @@ from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logge
 from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
 from rna_map_slurm.generate_job import (
     generate_split_fastq_jobs,
+    generate_trim_galore_jobs,
     generate_demultiplexing_jobs,
     generate_rna_map_jobs,
     generate_rna_map_combine_jobs,
-    generate_internal_demultiplex_jobs,
-    generate_join_int_demultiplex_jobs,
-    generate_internal_demultiplex_single_barcode,
-    generate_rna_map_single_barcode_jobs,
+    generate_join_fastq_files_jobs,
+    generate_int_demultiplex_jobs,
+    generate_int_demultiplex_rna_map_jobs,
 )
 from rna_map_slurm.jobs import get_user_jobs
 
@@ -220,6 +220,9 @@ def run():
 @cli.command()
 @click.argument("run_name")
 def get_data_csv(run_name):
+    os.makedirs("logs", exist_ok=True)
+    if os.path.isfile("logs/get_data_csv.log"):
+        os.remove("logs/get_data_csv.log")
     setup_logging(file_name="get_data_csv.log")
     df = get_sequence_run_info_sheet()
     # setup data.csv file ##########################################
@@ -252,11 +255,13 @@ def setup(data_csv, data_dirs, param_file):
     log.info("Setting up run")
     # setup directories ###########################################
     log.info("Setting up directories")
-    log.info("Creating directories: jobs, submits, data, inputs")
+    log.info("Creating directories: jobs, submits, data, inputs, results")
     os.makedirs("jobs", exist_ok=True)
     os.makedirs("submits", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     os.makedirs("inputs", exist_ok=True)
+    os.makedirs("results", exist_ok=True)
+    os.makedirs("results/pop_avg_pngs", exist_ok=True)
     # setup input directories ######################################
     os.makedirs("inputs/barcode_jsons", exist_ok=True)
     os.makedirs("inputs/fastas", exist_ok=True)
@@ -300,14 +305,14 @@ def setup(data_csv, data_dirs, param_file):
     # generate all jobs
     df_jobs = []
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
+    df_jobs.append(generate_trim_galore_jobs(params, num_dirs))
     df_jobs.append(generate_demultiplexing_jobs(params, num_dirs))
+    df_jobs.append(generate_join_fastq_files_jobs(params))
     df_jobs.append(generate_rna_map_jobs(params, num_dirs))
     df_jobs.append(generate_rna_map_combine_jobs(params))
     if num_int_demult > 0:
-        df_jobs.append(generate_internal_demultiplex_jobs(params, num_dirs))
-        df_jobs.append(generate_join_int_demultiplex_jobs(params))
-        df_jobs.append(generate_internal_demultiplex_single_barcode(params))
-        df_jobs.append(generate_rna_map_single_barcode_jobs(params))
+        df_jobs.append(generate_int_demultiplex_jobs(params, num_dirs))
+        df_jobs.append(generate_int_demultiplex_rna_map_jobs(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 
@@ -322,6 +327,7 @@ def clean(stage):
         shutil.rmtree("submits", ignore_errors=True)
         shutil.rmtree("data", ignore_errors=True)
         shutil.rmtree("inputs", ignore_errors=True)
+        shutil.rmtree("logs", ignore_errors=True)
     elif stage == "demultiplex":
         log.info("Cleaning demultiplex directories")
         dirs = glob.glob("data/split-*/[ACGT]*")

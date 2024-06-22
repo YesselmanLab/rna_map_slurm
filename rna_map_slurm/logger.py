@@ -14,9 +14,7 @@ def setup_logging(is_debug=False, file_name=None):
     # Create a stream handler for output to console
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)  # Set the desired level for console output
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
@@ -36,9 +34,7 @@ def setup_applevel_logger(logger_name=APP_LOGGER_NAME, is_debug=True, file_name=
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG if is_debug else logging.INFO)
 
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
 
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)

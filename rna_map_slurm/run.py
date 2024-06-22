@@ -2,13 +2,10 @@ import os
 import glob
 import shutil
 import click
-import gzip
-import zipfile
-import subprocess
 import pandas as pd
 import matplotlib.pyplot as plt
-from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor
+from typing import Callable, Any
+import datetime
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
@@ -16,6 +13,7 @@ from seq_tools.dataframe import to_fasta, to_dna
 from seq_tools.sequence import get_reverse_complement
 
 from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
+
 import rna_map
 from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
@@ -26,52 +24,40 @@ from rna_map.mutation_histogram import (
 from rna_map.parameters import get_preset_params
 
 from rna_map_slurm.logger import setup_logging, get_logger
-from rna_map_slurm.fastq import PairedFastqFiles, FastqFile, get_paired_fastqs
-from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.plotting import plot_pop_avg_from_row
-from rna_map_slurm.util import random_string, gzip_files, flatten_and_zip_directory
-from rna_map_slurm.tasks import split_fastq_file_task, demultiplex_task
+from rna_map_slurm.util import random_string
+from rna_map_slurm.tasks import BasicTasks
 
 log = get_logger("cli")
-
-
-def combine_gzipped_fastq(input_files, output_file):
-    with gzip.open(output_file, "wb") as output_gz:
-        for input_file in input_files:
-            with gzip.open(input_file, "rb") as input_gz:
-                for line in input_gz:
-                    output_gz.write(line)
-
-
-def process_pair(name_pair, barcode, zip_files, outdir, tmp_dir):
-    construct_barcode, pair = name_pair
-    count = 0
-    for zip_file in zip_files:
-        try:
-            with zipfile.ZipFile(zip_file, "r") as zip_ref:
-                zip_ref.extract(pair[0], f"{tmp_dir}/{count}")
-                zip_ref.extract(pair[1], f"{tmp_dir}/{count}")
-            count += 1
-        except:
-            continue
-    mate1_files = glob.glob(f"{tmp_dir}/*/{pair[0]}")
-    mate2_files = glob.glob(f"{tmp_dir}/*/{pair[1]}")
-    if len(mate1_files) == 0:
-        log.warning(f"no files found for {construct_barcode}")
-        return
-    if len(mate1_files) != len(mate2_files):
-        log.warning(f"mismatched files for {construct_barcode}")
-        return
-    log.info(f"{construct_barcode} {len(mate1_files)} {len(mate2_files)}")
-    combine_gzipped_fastq(mate1_files, f"{outdir}/{pair[0]}")
-    combine_gzipped_fastq(mate2_files, f"{outdir}/{pair[1]}")
-    subprocess.call(f"rm -r {tmp_dir}/*/{pair[0]}", shell=True)
-    subprocess.call(f"rm -r {tmp_dir}/*/{pair[1]}", shell=True)
 
 
 def get_file_size(file_path):
     file_path = os.path.realpath(file_path)
     return os.path.getsize(file_path)
+
+
+def time_it(func: Callable) -> Callable:
+    """
+    Decorator to measure the execution time of a function.
+
+    Args:
+        func (Callable): The function to be timed.
+
+    Returns:
+        Callable: The wrapped function with timing.
+    """
+
+    def wrapper(*args, **kwargs) -> Any:
+        start_time = datetime.datetime.now()
+        result = func(*args, **kwargs)
+        end_time = datetime.datetime.now()
+        elapsed_time = end_time - start_time
+        log.info(
+            f"Function '{func.__name__}' executed in {elapsed_time.total_seconds():.4f} seconds"
+        )
+        return result
+
+    return wrapper
 
 
 @click.group()
@@ -84,6 +70,7 @@ def cli():
 ################################################################################
 
 
+@time_it
 @cli.command()
 @click.argument("r1_path", type=click.Path(exists=True), required=True)
 @click.argument("r2_path", type=click.Path(exists=True), required=True)
@@ -112,23 +99,26 @@ def split_fastqs(r1_path, r2_path, output_dir, num_chunks, start, threads):
         num_chunks (int): Number of chunks to split the FASTQ files into.
     """
     setup_logging()
-    split_fastq_file_task(r1_path, output_dir, num_chunks, start, threads)
-    split_fastq_file_task(r2_path, output_dir, num_chunks, start, threads)
+    BasicTasks.split_fastq_file(r1_path, output_dir, num_chunks, start, threads)
+    BasicTasks.split_fastq_file(r2_path, output_dir, num_chunks, start, threads)
+    end_time = datetime.datetime.now()
 
 
+@time_it
 @cli.command()
 @click.argument("csv")
 @click.argument("r1_path", type=click.Path(exists=True))
 @click.argument("r2_path", type=click.Path(exists=True))
-@click.option("--output_dir", type=click.Path(exists=True))
+@click.argument("output_dir", type=click.Path(exists=True))
 def demultiplex(csv, r1_path, r2_path, output_dir):
     """
     demultiplexes paired fastq files given 3' end barcodes
     """
     setup_logging()
-    demultiplex_task(csv, r1_path, r2_path, output_dir)
+    BasicTasks.demultiplex(csv, r1_path, r2_path, output_dir)
 
 
+@time_it
 @cli.command()
 @click.argument("fasta_path", type=click.Path(exists=True))
 @click.argument("r1_path", type=click.Path(exists=True))
@@ -137,22 +127,18 @@ def demultiplex(csv, r1_path, r2_path, output_dir):
 @click.argument("output_dir", type=click.Path(exists=True))
 def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
     setup_logging()
-    curdir = os.getcwd()
-    os.chdir(output_dir)
-    params = get_preset_params("barcoded-library")
-    rna_map.run.run(fasta_path, r1_path, r2_path, csv_path, params)
-    shutil.rmtree("log")
-    shutil.rmtree("input")
-    shutil.rmtree("output/Mapping_Files")
-    os.chdir(curdir)
+    BasicTasks.rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir)
 
 
 # combine rna-map results ############################################################
 # takes regular rna-map results and combines them into a mutation_histos.p
+
+
+@time_it
 @cli.command()
 @click.argument("barcode_seq")
 @click.argument("rna_name")
-def combine_rna_map(barcode_seq, rna_name):
+def rna_map_combine(barcode_seq, rna_name):
     setup_logging()
     df = pd.read_csv("data.csv")
     df_sub = df.query("barcode_seq == @barcode_seq and construct == @rna_name")
@@ -166,8 +152,6 @@ def combine_rna_map(barcode_seq, rna_name):
             f"barcode_seq {barcode_seq} with rna {rna_name} has multiple entries in data.csv"
         )
     row = df_sub.iloc[0]
-    os.makedirs("results", exist_ok=True)
-    os.makedirs("results/pop_avg_pngs", exist_ok=True)
     run_path = "results/" + row["run_name"]
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
@@ -233,44 +217,30 @@ def combine_rna_map(barcode_seq, rna_name):
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
+@time_it
+@cli.command()
+def join_fastq_files():
+    setup_logging()
+    os.makedirs(f"demultiplexed", exist_ok=True)
+    df = pd.read_csv("data.csv")
+    for barcode, g in df.groupby("barcode_seq"):
+        os.makedirs(f"demultiplexed/{barcode}", exist_ok=True)
+        r1_files = glob.glob(f"data/*/{barcode}/test_R1.fastq.gz")
+        r2_files = glob.glob(f"data/*/{barcode}/test_R2.fastq.gz")
+        os.system(
+            f"cat {' '.join(r1_files)} > demultiplexed/{barcode}/test_R1.fastq.gz"
+        )
+        os.system(
+            f"cat {' '.join(r2_files)} > demultiplexed/{barcode}/test_R2.fastq.gz"
+        )
+
+
 ################################################################################
 ############################ With internal barcodes ############################
 ################################################################################
 
 
-@cli.command()
-@click.argument("fastq_dir", type=click.Path(exists=True))
-@click.option("--output_dir", default=None)
-def int_demultiplex(fastq_dir, output_dir):
-    setup_logging(file_name=f"{fastq_dir}/int_demultiplex.log")
-    if output_dir is None:
-        output_dir = os.getcwd()
-    df = pd.read_csv(f"data.csv")
-    read_1_path = fastq_dir + "/test_R1.fastq.gz"
-    read_2_path = fastq_dir + "/test_R2.fastq.gz"
-    barcode_seq = Path(fastq_dir).stem
-    df_sub = df.loc[df["barcode_seq"] == barcode_seq]
-    if df_sub.empty:
-        log.error(f"barcode_seq {barcode_seq} not found in data.csv")
-        return
-    row = df_sub.iloc[0]
-    # get helices from commandline
-    helices = []
-    args = row["demult_cmd"].split()
-    for i in range(0, len(args)):
-        if args[i] == "--helix" or args[i] == "-helix":
-            helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
-    unique_code = random_string(10)
-    data_path = f"{output_dir}/{unique_code}"
-    df_seq = pd.read_csv(f"inputs/rnas/{row['code']}.csv")
-    barcode_demultiplex(
-        df_seq, Path(read_2_path), Path(read_1_path), helices, data_path
-    )
-    zip_path = f"{fastq_dir}/int_demultiplexed.zip"
-    flatten_and_zip_directory(data_path, zip_path)
-    shutil.rmtree(data_path)
-
-
+@time_it
 @cli.command()
 @click.argument("construct_barcode")
 @click.argument("b1_seq")
@@ -279,15 +249,15 @@ def int_demultiplex(fastq_dir, output_dir):
 @click.argument("b1_max_pos", type=int)
 @click.argument("b2_min_pos", type=int)
 @click.argument("b2_max_pos", type=int)
-def int_demultiplex_single_barcode(
+def int_demultiplex(
     construct_barcode, b1_seq, b2_seq, b1_min_pos, b1_max_pos, b2_min_pos, b2_max_pos
 ):
     setup_logging()
     tmp_dir = "/scratch/" + random_string(10)
     print(tmp_dir)
     os.makedirs(tmp_dir, exist_ok=True)
-    r2_path = f"demultiplexed//{construct_barcode}/test_R2.fastq.gz"
-    r1_path = f"demultiplexed//{construct_barcode}/test_R1.fastq.gz"
+    r2_path = f"demultiplexed/{construct_barcode}/test_R2.fastq.gz"
+    r1_path = f"demultiplexed/{construct_barcode}/test_R1.fastq.gz"
     b2_seq_rc = get_reverse_complement(b2_seq)
     os.system(
         f'seqkit grep -s -p "{b1_seq}" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz'
@@ -314,68 +284,15 @@ def int_demultiplex_single_barcode(
     )
 
 
-@cli.command()
-@click.argument("home_dir", type=click.Path(exists=True))
-@click.argument("barcode_seq")
-@click.option("--threads", default=1)
-@click.option("--tmp_dir", default=None)
-def join_int_demultiplex(home_dir, barcode_seq, threads, tmp_dir):
-    if tmp_dir is None:
-        tmp_dir = os.getcwd()
-    # get all the zip files
-    dirs = glob.glob(f"{home_dir}/data/split-*")
-    zip_files = []
-    count = 0
-    for d in dirs:
-        zip_file = f"{d}/{barcode_seq}/int_demultiplexed.zip"
-        if not os.path.isfile(zip_file):
-            log.warning(f"{zip_file} does not exist")
-            continue
-        zip_files.append(zip_file)
-    # get the name pairs
-    df = pd.read_csv(f"{home_dir}/inputs/data.csv")
-    row = df[df["barcode_seq"] == barcode_seq].iloc[0]
-    df_barcode = pd.read_json(f"{home_dir}/inputs/barcode_jsons/{row['code']}.json")
-    pairs = {}
-    for _, r in df_barcode.iterrows():
-        full_barcode = r["full_barcode"]
-        pairs[full_barcode] = [
-            f"{full_barcode}_mate1.fastq.gz",
-            f"{full_barcode}_mate2.fastq.gz",
-        ]
-
-    outdir = f"{home_dir}/int_demultiplexed/{barcode_seq}"
-    os.makedirs(outdir, exist_ok=True)
-    tmp_dir = tmp_dir + "/" + random_string(10)
-    os.makedirs(tmp_dir, exist_ok=True)
-
-    with ProcessPoolExecutor(max_workers=threads) as executor:
-        executor.map(
-            process_pair,
-            pairs.items(),
-            [barcode_seq] * len(pairs),
-            [zip_files] * len(pairs),
-            [outdir] * len(pairs),
-            [tmp_dir] * len(pairs),
-        )
-
-    count = 0
-    for zip_file in zip_files:
-        shutil.rmtree(f"{tmp_dir}/{count}")
-        count += 1
-
-
+@time_it
 @cli.command()
 @click.argument("home_dir", type=click.Path(exists=True))
 @click.argument("lib_barcode_seq")
 @click.argument("construct_barcode_seq")
-@click.option("--tmp_dir", default=None)
-def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp_dir):
+def int_demultiplex_rna_map(home_dir, lib_barcode_seq, construct_barcode_seq):
     setup_logging()
-    if tmp_dir is None:
-        tmp_dir = os.getcwd()
     # get fastq files
-    fastq_dir = f"{home_dir}/int_demultiplexed/{lib_barcode_seq}"
+    fastq_dir = f"{home_dir}/int-demultiplexed/{lib_barcode_seq}"
     log.info(fastq_dir)
     log.info(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")
     mate_1_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")[0]
@@ -391,35 +308,25 @@ def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp
     row = df[df["barcode_seq"] == lib_barcode_seq].iloc[0]
     df_barcode = pd.read_json(f"{home_dir}/inputs/barcode_jsons/{row['code']}.json")
     df_barcode = df_barcode[df_barcode["full_barcode"] == construct_barcode_seq]
-    tmp_dir = tmp_dir + "/" + random_string(10)
-    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_dir = "/scratch/" + random_string(10)
+    cur_dir = os.path.abspath(os.getcwd())
     to_fasta(to_dna(df_barcode), f"{tmp_dir}/test.fasta")
     df_barcode = df_barcode[["name", "sequence", "structure"]]
     df_barcode.to_csv(f"{tmp_dir}/test.csv", index=False)
+    os.makedirs(tmp_dir, exist_ok=True)
+    os.chdir(tmp_dir)
     # update params
     params = get_preset_params("barcoded-library")
-    params["dirs"]["log"] = f"{tmp_dir}/log"
-    params["dirs"]["input"] = f"{tmp_dir}/input"
-    params["dirs"]["output"] = f"{tmp_dir}/output"
     # run rna-map
     try:
-        rna_map.run.run(
-            f"{tmp_dir}/test.fasta",
-            mate_1_path,
-            mate_2_path,
-            f"{tmp_dir}/test.csv",
-            params,
-        )
+        rna_map.run.run(f"test.fasta", mate_1_path, mate_2_path, "test.csv", params)
     except:
         log.error(f"rna-map failed for {construct_barcode_seq}")
         return
-    # clean up unncessary files
-    shutil.rmtree(f"{tmp_dir}/log")
-    os.makedirs(f"{tmp_dir}/input", exist_ok=True)
     # move to unique name to avoid collisions
     shutil.move(
         f"{tmp_dir}/output/BitVector_Files/mutation_histos.p",
-        f"{home_dir}/rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
+        f"{home_dir}/int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
     )
     shutil.rmtree(tmp_dir)
 
@@ -427,52 +334,17 @@ def rna_map_single_barcode(home_dir, lib_barcode_seq, construct_barcode_seq, tmp
 # single ###########################################################################
 
 
+@time_it
 @cli.command()
 @click.argument("run_name")
 def single_run(run_name):
     setup_logging(file_name="demultiplex.log")
-
-    paired_fastqs = PairedFastqFiles(FastqFile(r1_path), FastqFile(r2_path))
-    df = pd.read_csv(csv)
-    demultiplexer = SabreDemultiplexer()
-    demultiplexer.run(df, paired_fastqs, "demultiplexed")
+    pass
 
 
 ################################################################################
 ############################## Summary functions ###############################
 ################################################################################
-
-
-# TODO needs be refactored to grab data from that transfered in and doesnt do its own copying
-@cli.command()
-@click.option("--combine-all", is_flag=True)
-def fastq_concat(combine_all):
-    setup_logging()
-    os.makedirs(f"demultiplexed", exist_ok=True)
-    df = pd.read_csv("data.csv")
-    seq_path = os.environ["SEQPATH"]
-    for barcode, g in df.groupby("barcode_seq"):
-        rna_count = 0
-        for row in g.iterrows():
-            try:
-                df_rna = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
-                if len(df_rna) < 1000 and not combine_all:
-                    rna_count += 1
-            except:
-                rna_count += 1
-                continue
-        if rna_count == 0:
-            continue
-        log.info(f"in {barcode} {rna_count} rnas are  present")
-        os.makedirs(f"demultiplexed/{barcode}", exist_ok=True)
-        r1_files = glob.glob(f"data/*/{barcode}/test_R1.fastq.gz")
-        r2_files = glob.glob(f"data/*/{barcode}/test_R2.fastq.gz")
-        os.system(
-            f"cat {' '.join(r1_files)} > demultiplexed/{barcode}/test_R1.fastq.gz"
-        )
-        os.system(
-            f"cat {' '.join(r2_files)} > demultiplexed/{barcode}/test_R2.fastq.gz"
-        )
 
 
 if __name__ == "__main__":

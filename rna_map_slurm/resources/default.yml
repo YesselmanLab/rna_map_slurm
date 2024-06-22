@@ -1,56 +1,50 @@
 fastq_chunks: 100 
 tasks_per_job:
   default: 1
-  split_fastq: 1
+  split-fastq: 1
   demultiplex: 10
-  internal_demultiplex: 1
-  join_internal_demultiplex: 1
-  join_fastq: 1
-  rna_map: 25
-  rna_map_combine: 1
-  rna_map_single_barcode: 2
-  rna_map_single_barcode_combine: 1
+  trim-galore: 10
+  join-fastq-files: 1
+  rna-map: 25
+  internal-demultiplex: 10
+  int-demultiplex-rna-map: 25
 slurm_options:
-  extra_header_cmds: "" 
+  extra-header-cmds: "" 
   # used if nothing else is specified
   default:
-    time: "12:00:00"
+    time: "6:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
   # for fastq spliting 
-  split_fastq:
+  split-fastq:
     time: "04:00:00"
     cpus-per-task: 8
     mem-per-cpu: 64GB
+  trim-galore:
+    time: "04:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
   demultiplex:
     time: "04:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-  internal_demultiplex:
-    time: "48:00:00"
+  int-demultiplex:
+    time: "12:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-  join_internal_demultiplex:
-    time: "24:00:00"
-    cpus-per-task: 8
-    mem-per-cpu: 16GB
-  join_fastq:
-    time: "24:00:00"
+  join-fastq-files:
+    time: "12:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-  rna_map:
+  rna-map:
     time: "6:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-  rna_map_combine:
-    time: "2:00:00"
+  rna-map-combine:
+    time: "6:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-  rna_map_single_barcode:
-    time: "2:00:00"
-    cpus-per-task: 1
-    mem-per-cpu: 2GB
-  rna_map_single_barcode_combine:
+  int-demultiplex-rna-map:
     time: "2:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
