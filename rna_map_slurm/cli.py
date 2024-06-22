@@ -311,7 +311,7 @@ def setup(data_csv, data_dirs, param_file):
     df_jobs.append(generate_rna_map_jobs(params, num_dirs))
     df_jobs.append(generate_rna_map_combine_jobs(params))
     if num_int_demult > 0:
-        df_jobs.append(generate_int_demultiplex_jobs(params, num_dirs))
+        df_jobs.append(generate_int_demultiplex_jobs(params))
         df_jobs.append(generate_int_demultiplex_rna_map_jobs(params))
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
