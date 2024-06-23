@@ -7,11 +7,16 @@ import zipfile
 
 from rna_map_slurm.logger import get_logger
 
-log = get_logger(__name__)
+log = get_logger("UTIL")
 
 
 import random
 import string
+
+
+def get_file_size(file_path):
+    file_path = os.path.realpath(file_path)
+    return os.path.getsize(file_path)
 
 
 def random_string(length):
@@ -56,3 +61,18 @@ def flatten_and_zip_directory(input_directory, output_zip):
                 file_path = os.path.join(root, file)
                 # Save the file in the zip with only its base name
                 zip_ref.write(file_path, os.path.basename(file))
+
+
+def get_data_row(df, barcode_seq, rna_name):
+    df_sub = df.query("barcode_seq == @barcode_seq and construct == @rna_name")
+    if len(df_sub) == 0:
+        log.error(
+            f"barcode_seq {barcode_seq} with rna {rna_name} not found in data.csv"
+        )
+        return None
+    if len(df_sub) > 1:
+        log.warning(
+            f"barcode_seq {barcode_seq} with rna {rna_name} has multiple entries in data.csv"
+        )
+        return None
+    return df_sub.iloc[0]

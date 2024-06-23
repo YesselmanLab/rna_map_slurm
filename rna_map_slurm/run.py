@@ -25,15 +25,10 @@ from rna_map.parameters import get_preset_params
 
 from rna_map_slurm.logger import setup_logging, get_logger
 from rna_map_slurm.plotting import plot_pop_avg_from_row
-from rna_map_slurm.util import random_string
+from rna_map_slurm.util import random_string, get_data_row, get_file_size
 from rna_map_slurm.tasks import BasicTasks
 
-log = get_logger("cli")
-
-
-def get_file_size(file_path):
-    file_path = os.path.realpath(file_path)
-    return os.path.getsize(file_path)
+log = get_logger("CLI")
 
 
 def time_it(func: Callable) -> Callable:
@@ -156,7 +151,6 @@ def rna_map_combine(barcode_seq, rna_name):
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
     log.info(f"results path: {final_path}")
-    os.makedirs(run_path, exist_ok=True)
     os.makedirs(run_path, exist_ok=True)
     os.makedirs(final_path, exist_ok=True)
     dirs = glob.glob("data/split-*")
@@ -341,6 +335,66 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     )
     os.chdir(cur_dir)
     shutil.rmtree(tmp_dir)
+
+
+@time_it
+@cli.command()
+@click.argument("barcode_seq")
+@click.argument("rna_name")
+def int_demultiplex_rna_map_combine(barcode_seq, rna_name):
+    setup_logging()
+    df = pd.read_csv("data.csv")
+    row = get_data_row(df, barcode_seq, rna_name)
+    if row is None:
+        return
+    run_path = "results/" + row["run_name"]
+    dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
+    final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
+    log.info(f"results path: {final_path}")
+    os.makedirs(run_path, exist_ok=True)
+    os.makedirs(final_path, exist_ok=True)
+    mut_histo_files = glob.glob(f"int_demultiplexed_rna_map/{barcode_seq}/*p")
+    log.info(f"found {len(mut_histo_files)} files")
+    merged_mut_histos = {}
+    count_files = 0
+    for mut_hist_file in mut_histo_files:
+        merge_mut_histo_dicts(
+            merged_mut_histos, get_mut_histos_from_pickle_file(mut_hist_file)
+        )
+        count_files += 1
+    log.info(f"merged {count_files} files")
+    cols = [
+        "name",
+        "sequence",
+        "structure",
+        "pop_avg",
+        "sn",
+        "num_reads",
+        "num_aligned",
+        "no_mut",
+        "1_mut",
+        "2_mut",
+        "3_mut",
+        "3plus_mut",
+    ]
+    df_results = get_dataframe(merged_mut_histos, cols)
+    df_results.rename(columns={"pop_avg": "data"}, inplace=True)
+    df_results.to_json(final_path + "mutation_histos.json", orient="records")
+    i = 0
+    df_results = df_results.sort_values("num_aligned", ascending=False)
+    for _, row in df_results.iterrows():
+        plot_pop_avg_from_row(row)
+        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
+        plt.savefig(final_path + f"{row['name']}.png")
+        plt.close()
+        i += 1
+        if i > 100:
+            break
+        shutil.copy(
+            final_path + f"{row['name']}.png",
+            f"results/pop_avg_pngs/{dir_name}_{row['name']}.png",
+        )
+    write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
 # single ###########################################################################

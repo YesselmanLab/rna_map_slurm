@@ -14,6 +14,7 @@ tasks_per_job:
   rna-map: 25
   int-demultiplex: 10
   int-demultiplex-rna-map: 25
+  int-demultiplex-rna-map-combine: 1
 slurm_options:
   extra-header-cmds: "" 
   # used if nothing else is specified
@@ -51,6 +52,10 @@ slurm_options:
     cpus-per-task: 1
     mem-per-cpu: 2GB
   int-demultiplex-rna-map:
+    time: "2:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+  int-demultiplex-rna-map-combine:
     time: "2:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
