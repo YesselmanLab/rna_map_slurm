@@ -336,8 +336,8 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
         return
     # move to unique name to avoid collisions
     shutil.move(
-        f"{tmp_dir}/output/BitVector_Files/mutation_histos.p",
-        f"int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
+        f"output/BitVector_Files/mutation_histos.p",
+        f"{cur_dir}/int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
     )
     os.chdir(cur_dir)
     shutil.rmtree(tmp_dir)
