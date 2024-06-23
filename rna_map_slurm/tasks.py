@@ -140,6 +140,7 @@ class BasicTasks:
             log.info("Using existing input.csv file")
             csv_path = "input.csv"
         params = get_preset_params("barcoded-library")
+        params["overwrite"] = True
         log.info("Starting RNA mapping")
         rna_map.run.run(fa_path, r1_path, r2_path, csv_path, params)
 
