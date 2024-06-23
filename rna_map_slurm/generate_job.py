@@ -312,6 +312,7 @@ def generate_int_demultiplex_jobs(params, df):
     extra_header_cmds = params["slurm_options"]["extra-header-cmds"]
     add_dfs = []
     for _, row in df.iterrows():
+        os.makedirs(f"int-demultiplexed/{row['barcode_seq']}", exist_ok=True)
         df_barcodes = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
         df_barcodes["construct_barcode"] = row["barcode_seq"]
         add_dfs.append(df_barcodes)
@@ -364,7 +365,7 @@ def generate_int_demultiplex_rna_map_jobs(params, df):
     extra_header_cmds = params["slurm_options"]["extra-header-cmds"]
     runs = []
     for i, row in df.iterrows():
-        os.makedirs(f"rna_map/{row['barcode_seq']}", exist_ok=True)
+        os.makedirs(f"int-demultiplexed-rna-map/{row['barcode_seq']}", exist_ok=True)
         df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
         unique_barcodes = df_barcode["full_barcode"].unique()
         for barcode in unique_barcodes:

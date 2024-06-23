@@ -1,21 +1,21 @@
 import click
 import os
 import pandas as pd
-import numpy as np
 import shutil
 import json
 import glob
 import zipfile
 import time
-import subprocess
 import yaml
+import datetime
+from typing import Any, Callable
 
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
 from barcode_demultiplex.demultiplex import find_helix_barcodes
 
 from rna_map_slurm.fastq import get_paired_fastqs
-from rna_map_slurm.logger import setup_applevel_logger, setup_logging, get_logger
+from rna_map_slurm.logger import setup_logging, get_logger
 from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
 from rna_map_slurm.generate_job import (
     generate_split_fastq_jobs,
@@ -30,6 +30,31 @@ from rna_map_slurm.generate_job import (
 from rna_map_slurm.jobs import get_user_jobs
 
 log = get_logger(__name__)
+
+
+def time_it(func: Callable) -> Callable:
+    """
+    Decorator to measure the execution time of a function.
+
+    Args:
+        func (Callable): The function to be timed.
+
+    Returns:
+        Callable: The wrapped function with timing.
+    """
+
+    def wrapper(*args, **kwargs) -> Any:
+        start_time = datetime.datetime.now()
+        result = func(*args, **kwargs)
+        end_time = datetime.datetime.now()
+        elapsed_time = end_time - start_time
+        log.info(
+            f"Function '{func.__name__}' executed in {elapsed_time.total_seconds():.4f} seconds"
+        )
+        return result
+
+    return wrapper
+
 
 # helper functions for get_data_csv ##################################################
 
@@ -238,6 +263,7 @@ def cli():
 
 
 # TODO need a way to check to see if existing jobs have been run
+@time_it
 @cli.command()
 def run():
     start_time = time.time()
