@@ -202,6 +202,7 @@ def generate_jobs(df, params, all_pfqs):
     # generate all jobs
     single_df = df.query("demult_cmd.isnull()")
     single_df.to_csv("data/data-single.csv", index=False)
+    int_mult_df = df.query("not demult_cmd.isnull()")
     num_dirs = params["num_dirs"]
     df_jobs = []
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
@@ -211,7 +212,6 @@ def generate_jobs(df, params, all_pfqs):
     df_jobs.append(generate_rna_map_jobs(params, single_df))
     df_jobs.append(generate_rna_map_combine_jobs(params, single_df))
     if len(int_mult_df) > 0:
-        int_mult_df = df.query("not demult_cmd.isnull()")
         int_mult_df.to_csv("data/data-int_multiplex.csv", index=False)
         df_jobs.append(generate_int_demultiplex_jobs(params, int_mult_df))
         df_jobs.append(generate_int_demultiplex_rna_map_jobs(params, int_mult_df))
