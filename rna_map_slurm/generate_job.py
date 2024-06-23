@@ -387,7 +387,7 @@ def generate_int_demultiplex_jobs(params):
 
 def generate_int_demultiplex_rna_map_jobs(params):
     job_name = "int-demultiplex-rna-map"
-    os.makedirs("data/int_demultiplexed_rna_map", exist_ok=True)
+    os.makedirs("int_demultiplexed_rna_map", exist_ok=True)
     os.makedirs(f"jobs/{job_name}", exist_ok=True)
     runs_per_job = params["tasks_per_job"][job_name]
     slurm_params = params["slurm_options"][job_name]

@@ -291,13 +291,13 @@ def int_demultiplex(
 
 @time_it
 @cli.command()
-@click.argument("home_dir", type=click.Path(exists=True))
+@click.argument("code")
 @click.argument("lib_barcode_seq")
 @click.argument("construct_barcode_seq")
-def int_demultiplex_rna_map(home_dir, lib_barcode_seq, construct_barcode_seq):
+def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     setup_logging()
     # get fastq files
-    fastq_dir = f"{home_dir}/int-demultiplexed/{lib_barcode_seq}"
+    fastq_dir = f"int-demultiplexed/{lib_barcode_seq}"
     log.info(fastq_dir)
     log.info(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")
     mate_1_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")[0]
@@ -311,7 +311,7 @@ def int_demultiplex_rna_map(home_dir, lib_barcode_seq, construct_barcode_seq):
     # get sequences to make input files
     df = pd.read_csv("data.csv")
     row = df[df["barcode_seq"] == lib_barcode_seq].iloc[0]
-    df_barcode = pd.read_json(f"{home_dir}/inputs/barcode_jsons/{row['code']}.json")
+    df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
     df_barcode = df_barcode[df_barcode["full_barcode"] == construct_barcode_seq]
     tmp_dir = "/scratch/" + random_string(10)
     cur_dir = os.path.abspath(os.getcwd())
@@ -331,7 +331,7 @@ def int_demultiplex_rna_map(home_dir, lib_barcode_seq, construct_barcode_seq):
     # move to unique name to avoid collisions
     shutil.move(
         f"{tmp_dir}/output/BitVector_Files/mutation_histos.p",
-        f"{home_dir}/int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
+        f"int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
     )
     shutil.rmtree(tmp_dir)
 
