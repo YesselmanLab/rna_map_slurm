@@ -158,7 +158,7 @@ def setup_directories():
     os.makedirs("submits", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     os.makedirs("inputs", exist_ok=True)
-    os.makedirs("csvs", index=False)
+    os.makedirs("csvs", exist_ok=False)
     os.makedirs("results", exist_ok=True)
     os.makedirs("results/plots", exist_ok=True)
     os.makedirs("results/plots/pop_avg_pngs", exist_ok=True)
