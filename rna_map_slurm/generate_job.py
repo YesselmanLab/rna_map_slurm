@@ -401,7 +401,7 @@ def generate_int_demultiplex_rna_map_jobs(params):
         df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
         unique_barcodes = df_barcode["full_barcode"].unique()
         for barcode in unique_barcodes:
-            runs.append([row["barcode_seq"], barcode])
+            runs.append([row["code"], row["barcode_seq"], barcode])
     run_groups = [runs[i : i + runs_per_job] for i in range(0, len(runs), runs_per_job)]
     job_names = []
     for i, group in enumerate(run_groups):
@@ -411,9 +411,7 @@ def generate_int_demultiplex_rna_map_jobs(params):
         )
         job_body = ""
         for run in group:
-            job_body += (
-                f"rna-map-slurm-runner int-demultiplex-rna-map {run[0]} {run[1]}\n\n"
-            )
+            job_body += f"rna-map-slurm-runner int-demultiplex-rna-map {run[0]} {run[1]} {run[2]}\n\n"
         write_job_file(f"jobs/{job_name}", name, job_header + job_body)
         job_names.append(name)
     df_jobs = generate_job_list(

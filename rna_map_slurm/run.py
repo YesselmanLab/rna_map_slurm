@@ -310,7 +310,11 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
         return
     # get sequences to make input files
     df = pd.read_csv("data.csv")
-    row = df[df["barcode_seq"] == lib_barcode_seq].iloc[0]
+    df_sub = df.query("barcode_seq == @lib_barcode_seq and code == @code")
+    if len(df_sub) == 0:
+        log.error(f"no barcode_seq {lib_barcode_seq} with code {code} found")
+        return
+    row = df_sub.iloc[0]
     df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
     df_barcode = df_barcode[df_barcode["full_barcode"] == construct_barcode_seq]
     tmp_dir = "/scratch/" + random_string(10)
@@ -333,6 +337,7 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
         f"{tmp_dir}/output/BitVector_Files/mutation_histos.p",
         f"int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
     )
+    os.chdir(cur_dir)
     shutil.rmtree(tmp_dir)
 
 
