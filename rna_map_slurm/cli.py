@@ -170,7 +170,7 @@ def setup_directories():
     os.makedirs("inputs/rnas", exist_ok=True)
 
 
-def setup_input_files(df):
+def setup_input_files(df, seq_path):
     """
     Sets up input files for RNA mapping.
 
@@ -180,7 +180,6 @@ def setup_input_files(df):
     Returns:
         None
     """
-    seq_path = get_seq_path()
     # generate data dirs ###########################################
     for i, row in df.iterrows():
         df_seq = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
@@ -358,7 +357,7 @@ def setup(data_csv, data_dirs, param_file):
     yaml.dump(params, open("logs/params.yaml", "w"))
     setup_directories()
     # setup data files #############################################
-    seq_path = get_seq_path()
+    seq_path = get_seq_path(params)
     rm_df = df.query("exp_name.str.lower().str.startswith('eich')")
     rm_df.to_csv("data/data-eichhorn-constructs.csv", index=False)
     sub_df = df.query("not exp_name.str.lower().str.startswith('sub')")
@@ -370,7 +369,7 @@ def setup(data_csv, data_dirs, param_file):
             continue
         keep.append(i)
     sub_df = sub_df.iloc[keep]
-    setup_input_files(sub_df)
+    setup_input_files(sub_df, seq_path)
     log.info("\n" + json.dumps(params, indent=4))
     log.info("saved params to logs/params.yaml")
     log.info(f"data.csv has {len(df)} constructs")
