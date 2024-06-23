@@ -327,6 +327,7 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     # update params
     params = get_preset_params("barcoded-library")
     # run rna-map
+    rna_map.run.run(f"test.fasta", mate_1_path, mate_2_path, "test.csv", params)
     try:
         rna_map.run.run(f"test.fasta", mate_1_path, mate_2_path, "test.csv", params)
     except:
