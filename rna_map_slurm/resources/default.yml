@@ -1,4 +1,10 @@
 fastq_chunks: 100 
+paths:
+  log: "logs"
+  jobs: "jobs"
+  submits: "submits"
+  inputs: "inputs"
+  tmp: "/scratch"
 tasks_per_job:
   default: 1
   split-fastq: 1
@@ -48,6 +54,3 @@ slurm_options:
     time: "2:00:00"
     cpus-per-task: 1
     mem-per-cpu: 2GB
-paths:
-  tmp_dir: "/scratch/"
-  seq_path: 

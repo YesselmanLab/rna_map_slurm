@@ -262,9 +262,9 @@ def generate_rna_map_jobs(params, num_dirs):
                     f"{dir}/{row['barcode_seq']}/test_R1.fastq.gz"
                 )
                 fq2_path = os.path.abspath(
-                    f"{dir}/{row['barcode_seq']}test_R2.fastq.gz"
+                    f"{dir}/{row['barcode_seq']}/test_R2.fastq.gz"
                 )
-                job_body += f"rna-map-slurm-runner run-rna-map {fa_path} {fq1_path} {fq2_path} {dot_bracket_path} {output_dir}\n\n"
+                job_body += f"rna-map-slurm-runner run-rna-map {fa_path} {fq2_path} {fq1_path} {dot_bracket_path} {output_dir}\n\n"
             write_job_file(f"jobs/{job_name}", name, job_header + job_body)
             job_names.append(name)
             i += 1
