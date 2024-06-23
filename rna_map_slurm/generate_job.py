@@ -412,7 +412,7 @@ def generate_int_demultiplex_rna_map_jobs(params):
         job_body = ""
         for run in group:
             job_body += (
-                f"rna-map-slurm-runner rna-map-single-barcode {run[0]} {run[1]}\n\n"
+                f"rna-map-slurm-runner int-demultiplex-rna-map {run[0]} {run[1]}\n\n"
             )
         write_job_file(f"jobs/{job_name}", name, job_header + job_body)
         job_names.append(name)
