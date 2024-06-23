@@ -158,7 +158,7 @@ def setup_directories():
     os.makedirs("submits", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     os.makedirs("inputs", exist_ok=True)
-    os.makedirs("csvs", exist_ok=False)
+    os.makedirs("csvs", exist_ok=True)
     os.makedirs("results", exist_ok=True)
     os.makedirs("results/plots", exist_ok=True)
     os.makedirs("results/plots/pop_avg_pngs", exist_ok=True)
@@ -189,8 +189,6 @@ def setup_input_files(df, seq_path):
         if pd.isnull(row["demult_cmd"]):
             continue
         args = row["demult_cmd"].split()
-        if len(args) > 1:
-            num_int_demult += 1
         for i in range(0, len(args)):
             if args[i] == "--helix" or args[i] == "-helix":
                 helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
