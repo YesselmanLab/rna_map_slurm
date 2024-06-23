@@ -318,11 +318,11 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     df_barcode = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
     df_barcode = df_barcode[df_barcode["full_barcode"] == construct_barcode_seq]
     tmp_dir = "/scratch/" + random_string(10)
+    os.makedirs(tmp_dir, exist_ok=True)
     cur_dir = os.path.abspath(os.getcwd())
     to_fasta(to_dna(df_barcode), f"{tmp_dir}/test.fasta")
     df_barcode = df_barcode[["name", "sequence", "structure"]]
     df_barcode.to_csv(f"{tmp_dir}/test.csv", index=False)
-    os.makedirs(tmp_dir, exist_ok=True)
     os.chdir(tmp_dir)
     # update params
     params = get_preset_params("barcoded-library")
