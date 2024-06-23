@@ -302,6 +302,8 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     log.info(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")
     mate_1_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate1.fastq.gz")[0]
     mate_2_path = glob.glob(f"{fastq_dir}/{construct_barcode_seq}_mate2.fastq.gz")[0]
+    mate_1_path = os.path.abspath(mate_1_path)
+    mate_2_path = os.path.abspath(mate_2_path)
     # check to make sure files actually have stuff in them
     fsize_1 = get_file_size(mate_1_path)
     fsize_2 = get_file_size(mate_2_path)
@@ -327,7 +329,6 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     # update params
     params = get_preset_params("barcoded-library")
     # run rna-map
-    rna_map.run.run(f"test.fasta", mate_1_path, mate_2_path, "test.csv", params)
     try:
         rna_map.run.run(f"test.fasta", mate_1_path, mate_2_path, "test.csv", params)
     except:
