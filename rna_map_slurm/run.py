@@ -55,6 +55,56 @@ def time_it(func: Callable) -> Callable:
     return wrapper
 
 
+# helper functions #################################################################
+
+
+def get_mut_histo_dataframe(mut_histos):
+    cols = [
+        "name",
+        "sequence",
+        "structure",
+        "pop_avg",
+        "sn",
+        "num_reads",
+        "num_aligned",
+        "no_mut",
+        "1_mut",
+        "2_mut",
+        "3_mut",
+        "3plus_mut",
+    ]
+    df_results = get_dataframe(mut_histos, cols)
+    df_results.rename(columns={"pop_avg": "data"}, inplace=True)
+    return df_results
+
+
+def generate_pop_avg_plots(df_results, final_path, dir_name):
+    i = 0
+    for _, row in df_results.iterrows():
+        plot_pop_avg_from_row(row)
+        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
+        plt.savefig(final_path + f"{row['name']}.png")
+        plt.close()
+        shutil.copy(
+            final_path + f"{row['name']}.png",
+            f"results/plots/pop_avg_pngs/{dir_name}_{row['name']}.png",
+        )
+        ax = plot_pop_avg_from_row(row)
+        ax.set_ylim(0, 0.10)
+        plt.savefig(f"results/plots/pop_avg_pngs_0_10/{dir_name}_{row['name']}.png")
+        plt.close()
+        ax = plot_pop_avg_from_row(row)
+        ax.set_ylim(0, 0.05)
+        plt.savefig(f"results/plots/pop_avg_pngs_0_05/{dir_name}_{row['name']}.png")
+        plt.close()
+        i += 1
+        if i > 100:
+            break
+
+
+# cli ##############################################################################
+
+
 @click.group()
 def cli():
     pass
@@ -96,7 +146,6 @@ def split_fastqs(r1_path, r2_path, output_dir, num_chunks, start, threads):
     setup_logging()
     BasicTasks.split_fastq_file(r1_path, output_dir, num_chunks, start, threads)
     BasicTasks.split_fastq_file(r2_path, output_dir, num_chunks, start, threads)
-    end_time = datetime.datetime.now()
 
 
 @time_it
@@ -136,17 +185,7 @@ def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
 def rna_map_combine(barcode_seq, rna_name):
     setup_logging()
     df = pd.read_csv("data.csv")
-    df_sub = df.query("barcode_seq == @barcode_seq and construct == @rna_name")
-    if len(df_sub) == 0:
-        log.error(
-            f"barcode_seq {barcode_seq} with rna {rna_name} not found in data.csv"
-        )
-        return
-    if len(df_sub) > 1:
-        log.warning(
-            f"barcode_seq {barcode_seq} with rna {rna_name} has multiple entries in data.csv"
-        )
-    row = df_sub.iloc[0]
+    row = get_data_row(df, barcode_seq, rna_name)
     run_path = "results/" + row["run_name"]
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
@@ -156,6 +195,7 @@ def rna_map_combine(barcode_seq, rna_name):
     dirs = glob.glob("data/split-*")
     merged_mut_histos = None
     count_files = 0
+    merged_mut_histos = {}
     for d in dirs:
         mhs_path = (
             f"{d}/{barcode_seq}/{rna_name}/output/BitVector_Files/mutation_histos.p"
@@ -163,51 +203,14 @@ def rna_map_combine(barcode_seq, rna_name):
         if not os.path.isfile(mhs_path):
             log.warning("files not found:" + mhs_path)
             continue
-        if merged_mut_histos is None:
-            try:
-                merged_mut_histos = get_mut_histos_from_pickle_file(mhs_path)
-                count_files += 1
-            except:
-                log.warning(f"could not open file: {mhs_path}")
-        else:
-            try:
-                merge_mut_histo_dicts(
-                    merged_mut_histos, get_mut_histos_from_pickle_file(mhs_path)
-                )
-                count_files += 1
-            except:
-                log.warning(f"could not open file: {mhs_path}")
-    log.info(f"merged {count_files} files")
-    cols = [
-        "name",
-        "sequence",
-        "structure",
-        "pop_avg",
-        "sn",
-        "num_reads",
-        "num_aligned",
-        "no_mut",
-        "1_mut",
-        "2_mut",
-        "3_mut",
-        "3plus_mut",
-    ]
-    df_results = get_dataframe(merged_mut_histos, cols)
-    df_results.rename(columns={"pop_avg": "data"}, inplace=True)
-    df_results.to_json(final_path + "mutation_histos.json", orient="records")
-    i = 0
-    for _, row in df_results.iterrows():
-        plot_pop_avg_from_row(row)
-        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
-        plt.savefig(final_path + f"{row['name']}.png")
-        plt.close()
-        i += 1
-        if i > 100:
-            break
-        shutil.copy(
-            final_path + f"{row['name']}.png",
-            f"results/pop_avg_pngs/{dir_name}_{row['name']}.png",
+        merge_mut_histo_dicts(
+            merged_mut_histos, get_mut_histos_from_pickle_file(mhs_path)
         )
+        count_files += 1
+    log.info(f"merged {count_files} files")
+    df_results = get_mut_histo_dataframe(merged_mut_histos)
+    df_results.to_json(final_path + "mutation_histos.json", orient="records")
+    generate_pop_avg_plots(df_results, final_path, dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
@@ -276,10 +279,10 @@ def int_demultiplex(
     )
     os.system(cmd)
     os.system(
-        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz"
+        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz"
     )
     os.system(
-        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int_demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
+        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
     )
 
 
@@ -331,7 +334,7 @@ def int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq):
     # move to unique name to avoid collisions
     shutil.move(
         f"output/BitVector_Files/mutation_histos.p",
-        f"{cur_dir}/int_demultiplexed_rna_map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
+        f"{cur_dir}/int-demultiplexed-rna-map/{lib_barcode_seq}/mutation_histos_{construct_barcode_seq}.p",
     )
     os.chdir(cur_dir)
     shutil.rmtree(tmp_dir)
@@ -353,47 +356,17 @@ def int_demultiplex_rna_map_combine(barcode_seq, rna_name):
     log.info(f"results path: {final_path}")
     os.makedirs(run_path, exist_ok=True)
     os.makedirs(final_path, exist_ok=True)
-    mut_histo_files = glob.glob(f"int_demultiplexed_rna_map/{barcode_seq}/*p")
+    mut_histo_files = glob.glob(f"int-demultiplexed-rna-map/{barcode_seq}/*p")
     log.info(f"found {len(mut_histo_files)} files")
     merged_mut_histos = {}
-    count_files = 0
     for mut_hist_file in mut_histo_files:
         merge_mut_histo_dicts(
             merged_mut_histos, get_mut_histos_from_pickle_file(mut_hist_file)
         )
-        count_files += 1
-    log.info(f"merged {count_files} files")
-    cols = [
-        "name",
-        "sequence",
-        "structure",
-        "pop_avg",
-        "sn",
-        "num_reads",
-        "num_aligned",
-        "no_mut",
-        "1_mut",
-        "2_mut",
-        "3_mut",
-        "3plus_mut",
-    ]
-    df_results = get_dataframe(merged_mut_histos, cols)
-    df_results.rename(columns={"pop_avg": "data"}, inplace=True)
+    df_results = get_mut_histo_dataframe(merged_mut_histos)
     df_results.to_json(final_path + "mutation_histos.json", orient="records")
-    i = 0
     df_results = df_results.sort_values("num_aligned", ascending=False)
-    for _, row in df_results.iterrows():
-        plot_pop_avg_from_row(row)
-        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
-        plt.savefig(final_path + f"{row['name']}.png")
-        plt.close()
-        i += 1
-        if i > 100:
-            break
-        shutil.copy(
-            final_path + f"{row['name']}.png",
-            f"results/pop_avg_pngs/{dir_name}_{row['name']}.png",
-        )
+    generate_pop_avg_plots(df_results, final_path, dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 

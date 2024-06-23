@@ -29,8 +29,9 @@ from rna_map_slurm.generate_job import (
 )
 from rna_map_slurm.jobs import get_user_jobs
 
-
 log = get_logger(__name__)
+
+# helper functions for get_data_csv ##################################################
 
 
 def replace_spaces_warn(df, column_name):
@@ -92,6 +93,9 @@ def format_sequencing_run_info(df: pd.DataFrame):
     return df
 
 
+# helper functions for setup ##########################################################
+
+
 # TODO check if valid path?
 def get_seq_path(params) -> str:
     """
@@ -117,6 +121,83 @@ def get_seq_path(params) -> str:
         log.error("SEQPATH not set in environment variable or params file")
         exit()
     return seq_path
+
+
+def setup_directories():
+    """
+    Sets up the directories for the run.
+    """
+    log.info("Setting up directories")
+    log.info("Creating directories: jobs, submits, data, inputs, results")
+    os.makedirs("jobs", exist_ok=True)
+    os.makedirs("submits", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("inputs", exist_ok=True)
+    os.makedirs("csvs", index=False)
+    os.makedirs("results", exist_ok=True)
+    os.makedirs("results/plots", exist_ok=True)
+    os.makedirs("results/plots/pop_avg_pngs", exist_ok=True)
+    os.makedirs("results/plots/pop_avg_pngs_0_10", exist_ok=True)
+    os.makedirs("results/plots/pop_avg_pngs_0_05", exist_ok=True)
+    # setup input directories ######################################
+    os.makedirs("inputs/barcode_jsons", exist_ok=True)
+    os.makedirs("inputs/fastas", exist_ok=True)
+    os.makedirs("inputs/rnas", exist_ok=True)
+
+
+def setup_input_files(df):
+    """
+    Sets up input files for RNA mapping.
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame containing information about the RNA samples.
+
+    Returns:
+        None
+    """
+    seq_path = get_seq_path()
+    # generate data dirs ###########################################
+    for i, row in df.iterrows():
+        df_seq = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
+        shutil.copy(f"{seq_path}/fastas/{row['code']}.fasta", "inputs/fastas/")
+        df_seq.to_csv(f"inputs/rnas/{row['code']}.csv", index=False)
+        helices = []
+        if pd.isnull(row["demult_cmd"]):
+            continue
+        args = row["demult_cmd"].split()
+        if len(args) > 1:
+            num_int_demult += 1
+        for i in range(0, len(args)):
+            if args[i] == "--helix" or args[i] == "-helix":
+                helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
+        df_barcodes = find_helix_barcodes(df_seq, helices)
+        df_barcodes.to_json(
+            f"inputs/barcode_jsons/{row['code']}.json", orient="records"
+        )
+
+
+def generate_jobs(df, params, all_pfqs):
+    # generate all jobs
+    single_df = df.query("demult_cmd.isnull()")
+    single_df.to_csv("data/data-single.csv", index=False)
+    num_dirs = params["num_dirs"]
+    df_jobs = []
+    df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
+    df_jobs.append(generate_trim_galore_jobs(params, num_dirs))
+    df_jobs.append(generate_demultiplexing_jobs(params))
+    df_jobs.append(generate_join_fastq_files_jobs(params))
+    df_jobs.append(generate_rna_map_jobs(params, single_df))
+    df_jobs.append(generate_rna_map_combine_jobs(params, single_df))
+    if len(int_mult_df) > 0:
+        int_mult_df = df.query("not demult_cmd.isnull()")
+        int_mult_df.to_csv("data/data-int_multiplex.csv", index=False)
+        df_jobs.append(generate_int_demultiplex_jobs(params, int_mult_df))
+        df_jobs.append(generate_int_demultiplex_rna_map_jobs(params, int_mult_df))
+    df_job = pd.concat(df_jobs)
+    df_job.to_csv("jobs.csv", index=False)
+
+
+# helper functions for run ############################################################
 
 
 def submit_jobs(df):
@@ -232,7 +313,6 @@ def get_data_csv(run_name):
     df.to_csv("data.csv", index=False)
 
 
-# TODO output params file
 @cli.command()
 @click.argument("data_csv")
 @click.argument("data_dirs", nargs=-1)
@@ -250,71 +330,30 @@ def setup(data_csv, data_dirs, param_file):
         log.info("Using default parameters")
         params = get_default_parameters()
     yaml.dump(params, open("logs/params.yaml", "w"))
-    log.info("\n" + json.dumps(params, indent=4))
-    log.info(f"data.csv has {len(df)} constructs")
-    log.info("Setting up run")
-    # setup directories ###########################################
-    log.info("Setting up directories")
-    log.info("Creating directories: jobs, submits, data, inputs, results")
-    os.makedirs("jobs", exist_ok=True)
-    os.makedirs("submits", exist_ok=True)
-    os.makedirs("data", exist_ok=True)
-    os.makedirs("inputs", exist_ok=True)
-    os.makedirs("results", exist_ok=True)
-    os.makedirs("results/pop_avg_pngs", exist_ok=True)
-    # setup input directories ######################################
-    os.makedirs("inputs/barcode_jsons", exist_ok=True)
-    os.makedirs("inputs/fastas", exist_ok=True)
-    os.makedirs("inputs/rnas", exist_ok=True)
-    # setup input files ############################################
-    seq_path = get_seq_path(params)
-    if "demult_cmd" not in df.columns:
-        df["demult_cmd"] = np.nan
-    # generate data dirs ###########################################
-    num_int_demult = 0
-    for i, row in df.iterrows():
-        if row["exp_name"].lower().startswith("eich"):
-            continue
+    setup_directories()
+    # setup data files #############################################
+    seq_path = get_seq_path()
+    rm_df = df.query("exp_name.str.lower().str.startswith('eich')")
+    rm_df.to_csv("data/data-eichhorn-constructs.csv", index=False)
+    sub_df = df.query("not exp_name.str.lower().str.startswith('sub')")
+    sub_df.to_csv("data/data-yesselman-constructs.csv", index=False)
+    keep = []
+    for i, row in sub_df.iterrows():
         if not os.path.isfile(f"{seq_path}/rna/{row['code']}.csv"):
             log.warning(f"{row['code']} does not have a RNA CSV file!!!")
             continue
-        df_seq = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
-        shutil.copy(f"{seq_path}/fastas/{row['code']}.fasta", "inputs/fastas/")
-        df_seq.to_csv(f"inputs/rnas/{row['code']}.csv", index=False)
-        helices = []
-        if pd.isnull(row["demult_cmd"]):
-            continue
-        args = row["demult_cmd"].split()
-        if len(args) > 1:
-            num_int_demult += 1
-        for i in range(0, len(args)):
-            if args[i] == "--helix" or args[i] == "-helix":
-                helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
-        df_barcodes = find_helix_barcodes(df_seq, helices)
-        df_barcodes.to_json(
-            f"inputs/barcode_jsons/{row['code']}.json", orient="records"
-        )
+        keep.append(i)
+    sub_df = sub_df.iloc[keep]
+    setup_input_files(sub_df)
+    log.info("\n" + json.dumps(params, indent=4))
+    log.info("saved params to logs/params.yaml")
+    log.info(f"data.csv has {len(df)} constructs")
     all_pfqs = []
     for d in data_dirs:
         d = os.path.abspath(d)
         all_pfqs.extend(get_paired_fastqs(d))
-    num_dirs = params["fastq_chunks"] * len(all_pfqs)
-    params["num_dirs"] = num_dirs
-    for i in range(0, num_dirs):
-        os.makedirs(f"data/split-{i:04}", exist_ok=True)
-    # generate all jobs
-    df_jobs = []
-    df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
-    df_jobs.append(generate_trim_galore_jobs(params, num_dirs))
-    df_jobs.append(generate_demultiplexing_jobs(params, num_dirs))
-    df_jobs.append(generate_join_fastq_files_jobs(params))
-    df_jobs.append(generate_rna_map_jobs(params, num_dirs))
-    df_jobs.append(generate_rna_map_combine_jobs(params))
-    if num_int_demult > 0:
-        df_jobs.append(generate_int_demultiplex_jobs(params))
-        df_jobs.append(generate_int_demultiplex_rna_map_jobs(params))
-    df_job = pd.concat(df_jobs)
-    df_job.to_csv("jobs.csv", index=False)
+    params["num_dirs"] = params["fastq_chunks"] * len(all_pfqs)
+    generate_jobs(df, params, all_pfqs)
 
 
 @cli.command()
