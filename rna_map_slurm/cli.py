@@ -205,7 +205,7 @@ def generate_jobs(df, params, all_pfqs):
     num_dirs = params["num_dirs"]
     df_jobs = []
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
-    df_jobs.append(generate_trim_galore_jobs(params, num_dirs))
+    df_jobs.append(generate_trim_galore_jobs(params))
     df_jobs.append(generate_demultiplexing_jobs(params))
     df_jobs.append(generate_join_fastq_files_jobs(params))
     df_jobs.append(generate_rna_map_jobs(params, single_df))
