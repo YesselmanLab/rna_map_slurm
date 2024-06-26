@@ -133,9 +133,9 @@ class BasicTasks:
         os.chdir(output_dir)
         # TODO find a way to resolve this hack
         # a hack now to deal with adding additional constructs to be processed
-        if os.path.isfile("input.fa"):
+        if os.path.isfile("input.fasta"):
             log.info("Using existing input.fa file")
-            fa_path = "input.fa"
+            fa_path = "input.fasta"
         if os.path.isfile("input.csv"):
             log.info("Using existing input.csv file")
             csv_path = "input.csv"

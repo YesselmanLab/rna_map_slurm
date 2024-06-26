@@ -13,7 +13,6 @@ if sys.argv[-1] == "publish":
     os.system("python setup.py sdist upload")
     sys.exit()
 
-
 with open("README.md", "r", encoding="UTF-8") as f:
     readme = f.read()
 
