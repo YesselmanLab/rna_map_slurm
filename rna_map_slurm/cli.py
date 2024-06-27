@@ -28,7 +28,7 @@ from rna_map_slurm.generate_job import (
     generate_int_demultiplex_rna_map_jobs,
     generate_int_demultiplex_rna_map_combine_jobs,
 )
-from rna_map_slurm.summaries import get_demultiplexing_summary
+from rna_map_slurm.summaries import get_demultiplexing_summary, get_pop_avg_summary
 from rna_map_slurm.jobs import get_user_jobs
 
 log = get_logger(__name__)
@@ -392,7 +392,15 @@ def setup(data_csv, data_dirs, param_file):
 @cli.command()
 def generate_summaries():
     setup_logging()
-    get_demultiplexing_summary()
+    df_barcodes = get_demultiplexing_summary()
+    for run_name, g in df_barcodes.groupby("run_name"):
+        g.to_csv(f"results/{run_name}/summary/demultiplexing.csv", index=False)
+
+
+@cli.command()
+@click.argument("path", default=None)
+def deposit_results(path):
+    pass
 
 
 @cli.command()

@@ -1,16 +1,28 @@
 import os
 import re
-import csv
+import glob
 from collections import defaultdict
 import pandas as pd
-import numpy as np 
+import numpy as np
+from typing import Dict
 
 from rna_map_slurm.logger import get_logger
 
 log = get_logger("SUMMARIES")
 
 
-def find_fastq_records(directory):
+def find_fastq_records(directory: str) -> Dict[str, int]:
+    """
+    Finds and counts FastQ records for each barcode in the given directory.
+
+    Args:
+        directory (str): The directory to search for FastQ record files.
+
+    Returns:
+        Dict[str, int]: A dictionary containing the sum of counts for each barcode.
+                        The keys are the barcode names (str) and the values are the
+                        corresponding counts (int).
+    """
     # Dictionary to hold the sum of counts for each barcode
     barcode_counts = defaultdict(int)
     # Regular expression to match the desired line format
@@ -31,13 +43,51 @@ def find_fastq_records(directory):
     return barcode_counts
 
 
-def get_demultiplexing_summary():
+def find_mutation_histos_files(base_directory):
+    # List to hold the file information and DataFrames
+    file_info = []
+
+    # Define the glob pattern to find the mutation_histos.json files
+    pattern = os.path.join(
+        base_directory,
+        "results/*/processed/*/output/BitVector_Files/mutation_histos.json",
+    )
+
+    # Find all files matching the pattern
+    for file_path in glob.glob(pattern):
+        # Extract the variable parts of the path
+        parts = file_path.split("/")
+        run_name = parts[2]
+        dir_name = parts[4]
+
+        # Load the JSON file into a Pandas DataFrame
+        df = pd.read_json(file_path)
+
+        # Add run_name and dir columns
+        df["run_name"] = run_name
+        df["dir"] = dir_name
+
+        # Append the DataFrame to the list
+        file_info.append(df)
+
+    return file_info
+
+
+def get_pop_avg_summary() -> pd.DataFrame:
+    dfs = find_mutation_histos_files(".")
+    df = pd.concat(dfs)
+    total_aligns = df["num_aligns"].sum()
+    print(total_aligns)
+    return df
+
+
+def get_demultiplexing_summary() -> pd.DataFrame:
     directory = "jobs/demultiplex/"
     barcode_counts = find_fastq_records(directory)
-    df_barcodes = pd.DataFrame(list(barcode_counts.items()), columns=['sequence', 'num_reads'])
+    df_barcodes = pd.DataFrame(
+        list(barcode_counts.items()), columns=["sequence", "num_reads"]
+    )
     total_sum = np.sum(df_barcodes["num_reads"])
     log.info(f"total number of reads: {total_sum}")
-    df_barcodes["fraction"] = np.round(df_barcodes["num_reads"] / total_sum * 100, 3) 
-    df_barcodes.to_csv("results/demultiplexing.csv", index=False)
-     
-    
+    df_barcodes["fraction"] = np.round(df_barcodes["num_reads"] / total_sum * 100, 3)
+    return df_barcodes

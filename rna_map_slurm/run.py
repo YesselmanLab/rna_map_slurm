@@ -79,7 +79,7 @@ def get_mut_histo_dataframe(mut_histos):
 
 
 def generate_pop_avg_plots(
-    df_results: pd.DataFrame, final_path: str, dir_name: str
+    df_results: pd.DataFrame, run_name: str, dir_name: str
 ) -> None:
     """
     Generates population average plots from the DataFrame rows, saves them,
@@ -87,28 +87,33 @@ def generate_pop_avg_plots(
 
     Args:
         df_results (pd.DataFrame): DataFrame containing the results.
-        final_path (str): Path to save the final plot images.
+        run_name (str): Name of the run for organizing the saved plots.
         dir_name (str): Directory name for organizing the saved plots.
     """
     i = 0
     for _, row in df_results.iterrows():
         plot_pop_avg_from_row(row)
+        final_path = f"results/{run_name}/processed/{dir_name}/output/BitVector_Files/"
         plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         plt.savefig(final_path + f"{row['name']}.png")
         plt.close()
         shutil.copy(
             final_path + f"{row['name']}.png",
-            f"results/plots/pop_avg_pngs/{dir_name}_{row['name']}.png",
+            f"results/{run_name}/plots/pop_avg_pngs/{dir_name}_{row['name']}.png",
         )
         ax = plot_pop_avg_from_row(row)
         plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         ax.set_ylim(0, 0.10)
-        plt.savefig(f"results/plots/pop_avg_pngs_0_10/{dir_name}_{row['name']}.png")
+        plt.savefig(
+            f"results/{run_name}/plots/pop_avg_pngs_0_10/{dir_name}_{row['name']}.png"
+        )
         plt.close()
         ax = plot_pop_avg_from_row(row)
         plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         ax.set_ylim(0, 0.05)
-        plt.savefig(f"results/plots/pop_avg_pngs_0_05/{dir_name}_{row['name']}.png")
+        plt.savefig(
+            f"results/{run_name}/plots/pop_avg_pngs_0_05/{dir_name}_{row['name']}.png"
+        )
         plt.close()
         i += 1
         if i > 100:
@@ -187,10 +192,6 @@ def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
     BasicTasks.rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir)
 
 
-# combine rna-map results ############################################################
-# takes regular rna-map results and combines them into a mutation_histos.p
-
-
 @time_it
 @cli.command()
 @click.argument("barcode_seq")
@@ -223,7 +224,7 @@ def rna_map_combine(barcode_seq, rna_name):
     log.info(f"merged {count_files} files")
     df_results = get_mut_histo_dataframe(merged_mut_histos)
     df_results.to_json(final_path + "mutation_histos.json", orient="records")
-    generate_pop_avg_plots(df_results, final_path, dir_name)
+    generate_pop_avg_plots(df_results, row["run_name"], dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
@@ -367,7 +368,6 @@ def int_demultiplex_rna_map_combine(barcode_seq, rna_name):
     dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
     final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
     log.info(f"results path: {final_path}")
-    os.makedirs(run_path, exist_ok=True)
     os.makedirs(final_path, exist_ok=True)
     mut_histo_files = glob.glob(f"int-demultiplexed-rna-map/{barcode_seq}/*p")
     log.info(f"found {len(mut_histo_files)} files")
@@ -379,7 +379,7 @@ def int_demultiplex_rna_map_combine(barcode_seq, rna_name):
     df_results = get_mut_histo_dataframe(merged_mut_histos)
     df_results.to_json(final_path + "mutation_histos.json", orient="records")
     df_results = df_results.sort_values("num_aligned", ascending=False)
-    generate_pop_avg_plots(df_results, final_path, dir_name)
+    generate_pop_avg_plots(df_results, row["name"], dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
