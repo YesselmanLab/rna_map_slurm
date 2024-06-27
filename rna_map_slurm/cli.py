@@ -150,7 +150,7 @@ def get_seq_path(params) -> str:
     return seq_path
 
 
-def setup_directories():
+def setup_directories(df):
     """
     Sets up the directories for the run.
     """
@@ -161,11 +161,17 @@ def setup_directories():
     os.makedirs("data", exist_ok=True)
     os.makedirs("inputs", exist_ok=True)
     os.makedirs("csvs", exist_ok=True)
+    # setup results directories ######################################
     os.makedirs("results", exist_ok=True)
-    os.makedirs("results/plots", exist_ok=True)
-    os.makedirs("results/plots/pop_avg_pngs", exist_ok=True)
-    os.makedirs("results/plots/pop_avg_pngs_0_10", exist_ok=True)
-    os.makedirs("results/plots/pop_avg_pngs_0_05", exist_ok=True)
+    run_names = df["run_name"].unique()
+    for run_name in run_names:
+        os.makedirs(f"results/{run_name}", exist_ok=True)
+        os.makedirs(f"results/{run_name}/processed", exist_ok=True)
+        os.makedirs(f"results/{run_name}/summary", exist_ok=True)
+        os.makedirs(f"results/{run_name}/plots", exist_ok=True)
+        os.makedirs(f"results/{run_name}/plots/pop_avg_pngs", exist_ok=True)
+        os.makedirs(f"results/{run_name}/plots/pop_avg_pngs_0_10", exist_ok=True)
+        os.makedirs(f"results/{run_name}/plots/pop_avg_pngs_0_05", exist_ok=True)
     # setup input directories ######################################
     os.makedirs("inputs/barcode_jsons", exist_ok=True)
     os.makedirs("inputs/fastas", exist_ok=True)
@@ -357,7 +363,6 @@ def setup(data_csv, data_dirs, param_file):
         log.info("Using default parameters")
         params = get_default_parameters()
     yaml.dump(params, open("logs/params.yaml", "w"))
-    setup_directories()
     # setup data files #############################################
     seq_path = get_seq_path(params)
     rm_df = df.query("exp_name.str.lower().str.startswith('eich')")
@@ -372,6 +377,7 @@ def setup(data_csv, data_dirs, param_file):
         keep.append(i)
     sub_df = sub_df.iloc[keep]
     setup_input_files(sub_df, seq_path)
+    setup_directories(sub_df)
     log.info("\n" + json.dumps(params, indent=4))
     log.info("saved params to logs/params.yaml")
     log.info(f"data.csv has {len(df)} constructs")
