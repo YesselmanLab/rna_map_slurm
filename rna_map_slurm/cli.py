@@ -385,6 +385,7 @@ def setup(data_csv, data_dirs, param_file):
 
 @cli.command()
 def generate_summaries():
+    setup_logging()
     get_demultiplexing_summary()
 
 
