@@ -43,6 +43,7 @@ setup(
         "rna_map_slurm/paths",
         "rna_map_slurm/run",
         "rna_map_slurm/steps",
+        "rna_map_slurm/summaries",
         "rna_map_slurm/util",
     ],
     include_package_data=True,

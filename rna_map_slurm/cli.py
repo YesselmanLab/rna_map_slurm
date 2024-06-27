@@ -26,7 +26,9 @@ from rna_map_slurm.generate_job import (
     generate_join_fastq_files_jobs,
     generate_int_demultiplex_jobs,
     generate_int_demultiplex_rna_map_jobs,
+    generate_int_demultiplex_rna_map_combine_jobs,
 )
+from rna_map_slurm.summaries import get_demultiplexing_summary
 from rna_map_slurm.jobs import get_user_jobs
 
 log = get_logger(__name__)
@@ -201,9 +203,8 @@ def setup_input_files(df, seq_path):
 def generate_jobs(df, params, all_pfqs):
     # generate all jobs
     single_df = df.query("demult_cmd.isnull()")
-    single_df.to_csv("data/data-single.csv", index=False)
+    single_df.to_csv("csvs/data-single.csv", index=False)
     int_mult_df = df.query("not demult_cmd.isnull()")
-    num_dirs = params["num_dirs"]
     df_jobs = []
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
     df_jobs.append(generate_trim_galore_jobs(params))
@@ -212,9 +213,12 @@ def generate_jobs(df, params, all_pfqs):
     df_jobs.append(generate_rna_map_jobs(params, single_df))
     df_jobs.append(generate_rna_map_combine_jobs(params, single_df))
     if len(int_mult_df) > 0:
-        int_mult_df.to_csv("data/data-int_multiplex.csv", index=False)
+        int_mult_df.to_csv("csvs/data-int_multiplex.csv", index=False)
         df_jobs.append(generate_int_demultiplex_jobs(params, int_mult_df))
         df_jobs.append(generate_int_demultiplex_rna_map_jobs(params, int_mult_df))
+        df_jobs.append(
+            generate_int_demultiplex_rna_map_combine_jobs(params, int_mult_df)
+        )
     df_job = pd.concat(df_jobs)
     df_job.to_csv("jobs.csv", index=False)
 
@@ -357,9 +361,9 @@ def setup(data_csv, data_dirs, param_file):
     # setup data files #############################################
     seq_path = get_seq_path(params)
     rm_df = df.query("exp_name.str.lower().str.startswith('eich')")
-    rm_df.to_csv("data/data-eichhorn-constructs.csv", index=False)
+    rm_df.to_csv("csvs/data-eichhorn-constructs.csv", index=False)
     sub_df = df.query("not exp_name.str.lower().str.startswith('sub')")
-    sub_df.to_csv("data/data-yesselman-constructs.csv", index=False)
+    sub_df.to_csv("csvs/data-yesselman-constructs.csv", index=False)
     keep = []
     for i, row in sub_df.iterrows():
         if not os.path.isfile(f"{seq_path}/rna/{row['code']}.csv"):
@@ -377,6 +381,11 @@ def setup(data_csv, data_dirs, param_file):
         all_pfqs.extend(get_paired_fastqs(d))
     params["num_dirs"] = params["fastq_chunks"] * len(all_pfqs)
     generate_jobs(df, params, all_pfqs)
+
+
+@cli.command()
+def generate_summaries():
+    get_demultiplexing_summary()
 
 
 @cli.command()

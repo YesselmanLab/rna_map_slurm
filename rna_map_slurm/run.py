@@ -78,7 +78,18 @@ def get_mut_histo_dataframe(mut_histos):
     return df_results
 
 
-def generate_pop_avg_plots(df_results, final_path, dir_name):
+def generate_pop_avg_plots(
+    df_results: pd.DataFrame, final_path: str, dir_name: str
+) -> None:
+    """
+    Generates population average plots from the DataFrame rows, saves them,
+    and copies them to specified directories.
+
+    Args:
+        df_results (pd.DataFrame): DataFrame containing the results.
+        final_path (str): Path to save the final plot images.
+        dir_name (str): Directory name for organizing the saved plots.
+    """
     i = 0
     for _, row in df_results.iterrows():
         plot_pop_avg_from_row(row)
@@ -90,10 +101,12 @@ def generate_pop_avg_plots(df_results, final_path, dir_name):
             f"results/plots/pop_avg_pngs/{dir_name}_{row['name']}.png",
         )
         ax = plot_pop_avg_from_row(row)
+        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         ax.set_ylim(0, 0.10)
         plt.savefig(f"results/plots/pop_avg_pngs_0_10/{dir_name}_{row['name']}.png")
         plt.close()
         ax = plot_pop_avg_from_row(row)
+        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
         ax.set_ylim(0, 0.05)
         plt.savefig(f"results/plots/pop_avg_pngs_0_05/{dir_name}_{row['name']}.png")
         plt.close()

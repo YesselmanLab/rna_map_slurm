@@ -389,3 +389,26 @@ def generate_int_demultiplex_rna_map_jobs(params, df):
         f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist()
     )
     return df_jobs
+
+
+def generate_int_demultiplex_rna_map_combine_jobs(params, df):
+    job_name = "int-demultiplex-rna-map-combine"
+    os.makedirs(f"jobs/{job_name}", exist_ok=True)
+    slurm_params = params["slurm_options"][job_name]
+    extra_header_cmds = params["slurm_options"]["extra-header-cmds"]
+    job_names = []
+    for i, row in df.iterrows():
+        name = f"{job_name}-{i:04}"
+        job_header = create_job_header(
+            name, slurm_params, extra_header_cmds, f"jobs/{job_name}"
+        )
+        job_body = f"rna-map-slurm-runner int-demultiplex-rna-map-combine {row['barcode_seq']} {row['construct']}\n"
+        write_job_file(f"jobs/{job_name}", name, job_header + job_body)
+        job_names.append(name)
+    df_jobs = generate_job_list(
+        f"jobs/{job_name}", job_name, "int-demultiplexed-rna-map", job_names
+    )
+    generate_submit_file(
+        f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist()
+    )
+    return df_jobs
