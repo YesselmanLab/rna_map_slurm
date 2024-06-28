@@ -1,36 +1,38 @@
-import os
-import glob
-import shutil
-import click
-import pandas as pd
-import matplotlib.pyplot as plt
-from typing import Callable, Any
+# Standard library imports
 import datetime
+import glob
+import os
+import shutil
+from typing import Any, Callable
 
-from fastqsplitter import split_fastqs as fastqsplitter
+# Third-party library imports
+import click
+import matplotlib.pyplot as plt
+import pandas as pd
 
-from seq_tools.dataframe import to_fasta, to_dna
-from seq_tools.sequence import get_reverse_complement
-
+# Local application imports
 from barcode_demultiplex.demultiplex import demultiplex as barcode_demultiplex
-
+from fastqsplitter import split_fastqs as fastqsplitter
+from seq_tools.dataframe import to_dna, to_fasta
+from seq_tools.sequence import get_reverse_complement
 import rna_map
 from rna_map.mutation_histogram import (
-    merge_mut_histo_dicts,
-    get_mut_histos_from_pickle_file,
-    write_mut_histos_to_pickle_file,
     get_dataframe,
+    get_mut_histos_from_pickle_file,
+    merge_mut_histo_dicts,
+    write_mut_histos_to_pickle_file,
 )
 from rna_map.parameters import get_preset_params
 
-from rna_map_slurm.logger import setup_logging, get_logger
+# Current application imports
+from rna_map_slurm.logger import get_logger, setup_logging
 from rna_map_slurm.plotting import plot_pop_avg_from_row
-from rna_map_slurm.util import random_string, get_data_row, get_file_size
 from rna_map_slurm.tasks import BasicTasks
+from rna_map_slurm.util import get_data_row, get_file_size, random_string
 
 log = get_logger("CLI")
 
-z
+
 def time_it(func: Callable) -> Callable:
     """
     Decorator to measure the execution time of a function.

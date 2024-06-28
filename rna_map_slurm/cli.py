@@ -1,37 +1,43 @@
-import click
-import os
-import pandas as pd
-import shutil
-import json
+# Standard library imports
+import datetime
 import glob
-import zipfile
+import json
+import os
+import re
+import shutil
+import sys
 import time
 import yaml
-import datetime
-from typing import Any, Callable
+import zipfile
+from typing import Any, Callable, Dict
 
+# Third-party library imports
+import click
+import pandas as pd
+
+# Local application imports
+from barcode_demultiplex.demultiplex import find_helix_barcodes
 from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
-from barcode_demultiplex.demultiplex import find_helix_barcodes
-
+# current application
 from rna_map_slurm.fastq import get_paired_fastqs
-from rna_map_slurm.logger import setup_logging, get_logger
-from rna_map_slurm.parameters import get_parameters_from_file, get_default_parameters
 from rna_map_slurm.generate_job import (
+    generate_demultiplexing_jobs,
+    generate_int_demultiplex_jobs,
+    generate_int_demultiplex_rna_map_combine_jobs,
+    generate_int_demultiplex_rna_map_jobs,
+    generate_join_fastq_files_jobs,
+    generate_rna_map_combine_jobs,
+    generate_rna_map_jobs,
     generate_split_fastq_jobs,
     generate_trim_galore_jobs,
-    generate_demultiplexing_jobs,
-    generate_rna_map_jobs,
-    generate_rna_map_combine_jobs,
-    generate_join_fastq_files_jobs,
-    generate_int_demultiplex_jobs,
-    generate_int_demultiplex_rna_map_jobs,
-    generate_int_demultiplex_rna_map_combine_jobs,
 )
-from rna_map_slurm.summaries import get_demultiplexing_summary, get_pop_avg_summary
 from rna_map_slurm.jobs import get_user_jobs
+from rna_map_slurm.logger import get_logger, setup_logging
+from rna_map_slurm.parameters import get_default_parameters, get_parameters_from_file
+from rna_map_slurm.summaries import get_demultiplexing_summary, get_pop_avg_summary
 
-log = get_logger(__name__)
+log = get_logger("CLI")
 
 
 def time_it(func: Callable) -> Callable:
@@ -360,6 +366,12 @@ def setup(data_csv, data_dirs, param_file):
     else:
         log.info("Using default parameters")
         params = get_default_parameters()
+    # Log all Click parameters
+    ctx = click.get_current_context()
+    log.info("Ran at commandline as: %s", " ".join(sys.argv))
+    log.info("Command line arguments and options:")
+    for param, value in ctx.params.items():
+        log.info(f"{param}: {value}")
     yaml.dump(params, open("logs/params.yaml", "w"))
     # setup data files #############################################
     seq_path = get_seq_path(params)
@@ -420,9 +432,30 @@ def deposit_results(version, path, overwrite):
         exit(1)
     if path is None:
         path = os.environ.get("NRDSTORSHARED")
-    # data_path =
+    log_file_path = "logs/setup.log"
+    data_dirs = None
+    with open(log_file_path, "r") as log_file:
+        for line in log_file:
+            match = re.match(r"^RNA-MAP-SLURM\.CLI - INFO - data_dirs: \((.*)\)", line)
+            if match:
+                data_dirs = match.group(1).split(",")[:1]
+                break
+    # remove the extra quotes
+    data_dirs = [x[1:-1] for x in data_dirs]
+    if len(data_dirs) != 1:
+        log.error(
+            "Have not implemented dealing with multiple data dirs - need to handle this manually!"
+        )
     df = pd.read_csv("data.csv")
-
+    run_names = df["run_name"].unique()
+    for run_name in run_names:
+        run_save_path = f"{path}/{run_name}"
+        if not os.path.isdir(run_save_path):
+            log.info(f"{run_save_path} does not exist, creating")
+            os.makedirs(run_save_path)
+        raw_path = f"{run_save_path}/raw"
+        if not os.path.isdir(raw_path):
+            os.system(f"cp -r {data_dirs[0]} {raw_path}")
 
 @cli.command()
 @click.argument("stage")
