@@ -52,32 +52,22 @@ def find_mutation_histos_files(base_directory):
         base_directory,
         "results/*/processed/*/output/BitVector_Files/mutation_histos.json",
     )
-
     # Find all files matching the pattern
     for file_path in glob.glob(pattern):
-        # Extract the variable parts of the path
-        parts = file_path.split("/")
-        run_name = parts[2]
-        dir_name = parts[4]
-
         # Load the JSON file into a Pandas DataFrame
         df = pd.read_json(file_path)
-
-        # Add run_name and dir columns
-        df["run_name"] = run_name
-        df["dir"] = dir_name
-
         # Append the DataFrame to the list
         file_info.append(df)
-
     return file_info
 
 
 def get_pop_avg_summary() -> pd.DataFrame:
     dfs = find_mutation_histos_files(".")
     df = pd.concat(dfs)
-    total_aligns = df["num_aligns"].sum()
-    print(total_aligns)
+    total_reads = df["num_reads"].sum()
+    total_aligns = df["num_aligned"].sum()
+    log.info(f"total number of reads from rna_map: {total_reads}")
+    log.info(f"total number of aligns from rna_map: {total_aligns}")
     return df
 
 
@@ -88,6 +78,6 @@ def get_demultiplexing_summary() -> pd.DataFrame:
         list(barcode_counts.items()), columns=["sequence", "num_reads"]
     )
     total_sum = np.sum(df_barcodes["num_reads"])
-    log.info(f"total number of reads: {total_sum}")
+    log.info(f"total number of reads from demultiplexing : {total_sum}")
     df_barcodes["fraction"] = np.round(df_barcodes["num_reads"] / total_sum * 100, 3)
     return df_barcodes

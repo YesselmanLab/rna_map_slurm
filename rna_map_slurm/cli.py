@@ -64,7 +64,7 @@ def time_it(func: Callable) -> Callable:
 def replace_spaces_warn(df, column_name):
     """
     Replaces spaces with underscores in a specified column of a DataFrame and logs a warning
-      for each change.
+    for each change.
 
     Parameters:
     df (pd.DataFrame): The DataFrame containing the data.
@@ -73,14 +73,13 @@ def replace_spaces_warn(df, column_name):
     Returns:
     pd.DataFrame: The DataFrame with spaces replaced by underscores in the specified column.
     """
-    index = 0
-    for value in df[column_name]:
+    for index, row in df.iterrows():
+        value = row[column_name]
         if " " in str(value):
             log.warning(
                 f"Replacing spaces with underscores in row {index} for column '{column_name}'. Original value: '{value}'"
             )
             df.at[index, column_name] = value.replace(" ", "_")
-        index += 1
     return df
 
 
@@ -160,7 +159,6 @@ def setup_directories(df):
     os.makedirs("submits", exist_ok=True)
     os.makedirs("data", exist_ok=True)
     os.makedirs("inputs", exist_ok=True)
-    os.makedirs("csvs", exist_ok=True)
     # setup results directories ######################################
     os.makedirs("results", exist_ok=True)
     run_names = df["run_name"].unique()
@@ -365,10 +363,12 @@ def setup(data_csv, data_dirs, param_file):
     yaml.dump(params, open("logs/params.yaml", "w"))
     # setup data files #############################################
     seq_path = get_seq_path(params)
+    os.makedirs("csvs", exist_ok=True)
     rm_df = df.query("exp_name.str.lower().str.startswith('eich')")
     rm_df.to_csv("csvs/data-eichhorn-constructs.csv", index=False)
     sub_df = df.query("not exp_name.str.lower().str.startswith('sub')")
     sub_df.to_csv("csvs/data-yesselman-constructs.csv", index=False)
+    setup_directories(sub_df)
     keep = []
     for i, row in sub_df.iterrows():
         if not os.path.isfile(f"{seq_path}/rna/{row['code']}.csv"):
@@ -377,7 +377,6 @@ def setup(data_csv, data_dirs, param_file):
         keep.append(i)
     sub_df = sub_df.iloc[keep]
     setup_input_files(sub_df, seq_path)
-    setup_directories(sub_df)
     log.info("\n" + json.dumps(params, indent=4))
     log.info("saved params to logs/params.yaml")
     log.info(f"data.csv has {len(df)} constructs")
@@ -392,15 +391,37 @@ def setup(data_csv, data_dirs, param_file):
 @cli.command()
 def generate_summaries():
     setup_logging()
+    df = pd.read_csv("data.csv")
     df_barcodes = get_demultiplexing_summary()
-    for run_name, g in df_barcodes.groupby("run_name"):
-        g.to_csv(f"results/{run_name}/summary/demultiplexing.csv", index=False)
+    run_names = df["run_name"].unique()
+    for run_name in run_names:
+        df_sub = df.query("run_name == @run_name")
+        barcodes = df_sub["barcode_seq"].unique()
+        df_barcodes_sub = df_barcodes.query("sequence in @barcodes")
+        df_barcodes_sub.to_csv(
+            f"results/{run_name}/summary/demultiplexing.csv", index=False
+        )
+
+    df_summary = get_pop_avg_summary()
+    for run_name, g in df_summary.groupby("run_name"):
+        g.to_json(f"results/{run_name}/summary/summary.json", orient="records")
+        g.drop(columns=["data"], inplace=True)
+        g.to_csv(f"results/{run_name}/summary/summary.csv", index=False)
 
 
 @cli.command()
-@click.argument("path", default=None)
-def deposit_results(path):
-    pass
+@click.option("-v", "--version", default="v1", type=str)
+@click.option("-p", "--path", default=None)
+@click.option("--overwrite", type=bool)
+def deposit_results(version, path, overwrite):
+    setup_logging()
+    if not version.startswith("v"):
+        log.error("version needs to start with v")
+        exit(1)
+    if path is None:
+        path = os.environ.get("NRDSTORSHARED")
+    # data_path =
+    df = pd.read_csv("data.csv")
 
 
 @cli.command()

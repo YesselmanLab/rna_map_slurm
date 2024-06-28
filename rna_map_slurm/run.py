@@ -30,7 +30,7 @@ from rna_map_slurm.tasks import BasicTasks
 
 log = get_logger("CLI")
 
-
+z
 def time_it(func: Callable) -> Callable:
     """
     Decorator to measure the execution time of a function.
@@ -92,9 +92,12 @@ def generate_pop_avg_plots(
     """
     i = 0
     for _, row in df_results.iterrows():
+        log.info("plotting : " + row["name"])
         plot_pop_avg_from_row(row)
         final_path = f"results/{run_name}/processed/{dir_name}/output/BitVector_Files/"
-        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
+        plt.title(
+            "num_aligned: " + str(row["num_aligned"]) + "   sn: " + str(row["sn"])
+        )
         plt.savefig(final_path + f"{row['name']}.png")
         plt.close()
         shutil.copy(
@@ -102,21 +105,25 @@ def generate_pop_avg_plots(
             f"results/{run_name}/plots/pop_avg_pngs/{dir_name}_{row['name']}.png",
         )
         ax = plot_pop_avg_from_row(row)
-        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
+        plt.title(
+            "num_aligned: " + str(row["num_aligned"]) + "   sn: " + str(row["sn"])
+        )
         ax.set_ylim(0, 0.10)
         plt.savefig(
             f"results/{run_name}/plots/pop_avg_pngs_0_10/{dir_name}_{row['name']}.png"
         )
         plt.close()
         ax = plot_pop_avg_from_row(row)
-        plt.title("num_aligned: " + str(row["num_aligned"]) + "\tsn: " + str(row["sn"]))
+        plt.title(
+            "num_aligned: " + str(row["num_aligned"]) + "   sn: " + str(row["sn"])
+        )
         ax.set_ylim(0, 0.05)
         plt.savefig(
             f"results/{run_name}/plots/pop_avg_pngs_0_05/{dir_name}_{row['name']}.png"
         )
         plt.close()
         i += 1
-        if i > 100:
+        if i > 50:
             break
 
 
@@ -223,6 +230,12 @@ def rna_map_combine(barcode_seq, rna_name):
         count_files += 1
     log.info(f"merged {count_files} files")
     df_results = get_mut_histo_dataframe(merged_mut_histos)
+    df_results["rna_name"] = rna_name
+    cols = list(row.keys())
+    for c in "demult_cmd,length".split(","):
+        cols.remove(c)
+    for c in cols:
+        df_results[c] = row[c]
     df_results.to_json(final_path + "mutation_histos.json", orient="records")
     generate_pop_avg_plots(df_results, row["run_name"], dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
@@ -372,14 +385,24 @@ def int_demultiplex_rna_map_combine(barcode_seq, rna_name):
     mut_histo_files = glob.glob(f"int-demultiplexed-rna-map/{barcode_seq}/*p")
     log.info(f"found {len(mut_histo_files)} files")
     merged_mut_histos = {}
+    i = 0
     for mut_hist_file in mut_histo_files:
+        if i % 100 == 0:
+            log.info(f"merged {i} mut histos")
         merge_mut_histo_dicts(
             merged_mut_histos, get_mut_histos_from_pickle_file(mut_hist_file)
         )
+        i += 1
     df_results = get_mut_histo_dataframe(merged_mut_histos)
+    df_results["rna_name"] = rna_name
+    cols = list(row.keys())
+    for c in "demult_cmd,length".split(","):
+        cols.remove(c)
+    for c in cols:
+        df_results[c] = row[c]
     df_results.to_json(final_path + "mutation_histos.json", orient="records")
     df_results = df_results.sort_values("num_aligned", ascending=False)
-    generate_pop_avg_plots(df_results, row["name"], dir_name)
+    generate_pop_avg_plots(df_results, row["run_name"], dir_name)
     write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
 
 
