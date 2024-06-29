@@ -33,7 +33,7 @@ class SabreDemultiplexer:
         r2_path = paired_fqs.read_2.path
         command = (
             f"sabre pe -f {r1_path} -r {r2_path} -b barcode.txt "
-            f"-u NC/test_R1.fastq -w NC/test_R2.fastq -m 4"
+            f"-u NC/test_R1.fastq -w NC/test_R2.fastq -m 2"
         )
         log.info(f"Running sabre with command: {command}")
 

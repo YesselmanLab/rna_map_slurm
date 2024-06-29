@@ -217,7 +217,7 @@ def generate_jobs(df, params, all_pfqs):
     int_mult_df = df.query("not demult_cmd.isnull()")
     df_jobs = []
     df_jobs.append(generate_split_fastq_jobs(all_pfqs, params))
-    df_jobs.append(generate_trim_galore_jobs(params))
+    # df_jobs.append(generate_trim_galore_jobs(params))
     df_jobs.append(generate_demultiplexing_jobs(params))
     df_jobs.append(generate_join_fastq_files_jobs(params))
     df_jobs.append(generate_rna_map_jobs(params, single_df))
@@ -278,8 +278,9 @@ def cli():
 @cli.command()
 def run():
     start_time = time.time()
-    setup_logging(file_name="run.log")
-    # user_jobs = get_user_jobs("jyesselm")
+    if os.path.isfile("logs/run.log"):
+        os.remove("logs/run.log")
+    setup_logging(file_name="logs/run.log")
     df = pd.read_csv("jobs.csv")
     df["status"] = "not_started"
     df_can_run = df[df["job_requirement"].isna()]
@@ -402,7 +403,9 @@ def setup(data_csv, data_dirs, param_file):
 
 @cli.command()
 def generate_summaries():
-    setup_logging()
+    if os.path.isfile("logs/generate-summaries.log"):
+        os.remove("logs/generate-summaries.log")
+    setup_logging(file_name="logs/generate-summaries.log")
     df = pd.read_csv("data.csv")
     df_barcodes = get_demultiplexing_summary()
     run_names = df["run_name"].unique()
@@ -453,9 +456,33 @@ def deposit_results(version, path, overwrite):
         if not os.path.isdir(run_save_path):
             log.info(f"{run_save_path} does not exist, creating")
             os.makedirs(run_save_path)
+        df_sub = df.query("run_name == @run_name")
+        df_sub.to_csv(f"{run_save_path}/data.csv", index=False)
+        log.info(f"copying data.csv to {run_save_path}")
+        os.system(f"cp -r logs {run_save_path}")
+        os.system(f"cp -r csvs {run_save_path}")
+        log.info(f"copying logs and csvs to {run_save_path}")
         raw_path = f"{run_save_path}/raw"
-        if not os.path.isdir(raw_path):
+        if not os.path.isdir(raw_path) and len(data_dirs) == 1:
+            log.info(f"copying {data_dirs[0]} to {raw_path}")
             os.system(f"cp -r {data_dirs[0]} {raw_path}")
+        demultiplex_path = f"{run_save_path}/demultiplexed"
+        if not os.path.isdir(demultiplex_path):
+            log.info(f"copying demultiplexed to {demultiplex_path}")
+            os.system(f"cp -r demultiplexed {run_save_path}")
+        analysis_path = f"{run_save_path}/analysis"
+        if not os.path.isdir(analysis_path):
+            log.info(f"{analysis_path} does not exist, creating")
+            os.makedirs(analysis_path)
+        v_path = f"{run_save_path}/analysis/{version}"
+        if os.path.isdir(v_path) and not overwrite:
+            log.error(
+                f"{v_path} exists please pick another version number or supply --overwrite"
+            )
+            return
+        log.info(f"copying results/{run_name} to {v_path}")
+        os.system(f"cp -r results/{run_name} {v_path}")
+
 
 @cli.command()
 @click.argument("stage")

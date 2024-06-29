@@ -200,13 +200,13 @@ def generate_demultiplexing_jobs(params: Dict) -> pd.DataFrame:
         )
         job_body = "\n".join(
             [
-                f"rna-map-slurm-runner demultiplex {csv_path} {d}/test_R1_val_1.fq.gz {d}/test_R2_val_2.fq.gz {d}\n"
+                f"rna-map-slurm-runner demultiplex {csv_path} {d}/test_R1.fastq.gz {d}/test_R2.fastq.gz {d}\n"
                 for d in dg
             ]
         )
         write_job_file(f"jobs/{job_name}", name, job_header + job_body)
         job_names.append(name)
-    df_jobs = generate_job_list(f"jobs/{job_name}", job_name, "trim-galore", job_names)
+    df_jobs = generate_job_list(f"jobs/{job_name}", job_name, "split-fastq", job_names)
     generate_submit_file(
         f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist()
     )
