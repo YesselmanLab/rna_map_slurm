@@ -2,13 +2,19 @@ import os
 import pandas as pd
 import shutil
 import subprocess
+import glob
 from typing import List, Optional
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
 from rna_map.parameters import get_preset_params
 import rna_map
-
+from rna_map.mutation_histogram import (
+    get_dataframe,
+    get_mut_histos_from_pickle_file,
+    merge_mut_histo_dicts,
+    write_mut_histos_to_pickle_file,
+)
 
 from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
 from rna_map_slurm.demultiplex import SabreDemultiplexer
@@ -141,6 +147,8 @@ class BasicTasks:
             csv_path = "input.csv"
         params = get_preset_params("barcoded-library")
         params["overwrite"] = True
+        # TODO do I want to do this?
+        params["bit_vector"]["summary_output_only"] = True
         log.info("Starting RNA mapping")
         rna_map.run.run(fa_path, r1_path, r2_path, csv_path, params)
 
@@ -151,8 +159,43 @@ class BasicTasks:
         os.chdir(cur_dir)
 
     @staticmethod
-    def rna_map_combine():
-        pass
+    def rna_map_combine(row: pd.Series) -> None:
+        barcode_seq = row["barcode_seq"]
+        rna_name = row["rna_name"]
+        run_path = "results/" + row["run_name"]
+        dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
+        final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
+        log.info(f"results path: {final_path}")
+        os.makedirs(run_path, exist_ok=True)
+        os.makedirs(final_path, exist_ok=True)
+        dirs = glob.glob("data/split-*")
+        merged_mut_histos = None
+        count_files = 0
+        merged_mut_histos = {}
+        for d in dirs:
+            mhs_path = (
+                f"{d}/{barcode_seq}/{rna_name}/output/BitVector_Files/mutation_histos.p"
+            )
+            if not os.path.isfile(mhs_path):
+                log.warning("files not found:" + mhs_path)
+                continue
+            merge_mut_histo_dicts(
+                merged_mut_histos, get_mut_histos_from_pickle_file(mhs_path)
+            )
+            count_files += 1
+        log.info(f"merged {count_files} files")
+        df_results = get_mut_histo_dataframe(merged_mut_histos)
+        df_results["rna_name"] = rna_name
+        cols = list(row.keys())
+        for c in "demult_cmd,length".split(","):
+            cols.remove(c)
+        for c in cols:
+            df_results[c] = row[c]
+        df_results.to_json(final_path + "mutation_histos.json", orient="records")
+        generate_pop_avg_plots(df_results, row["run_name"], dir_name)
+        write_mut_histos_to_pickle_file(
+            merged_mut_histos, final_path + "mutation_histos.p"
+        )
 
 
 class IntDemultiplexTasks:
