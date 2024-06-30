@@ -216,7 +216,9 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
     if start_step <= 4:
         df_single = pd.read_csv("csvs/data-single.csv")
         rna_map_combine_tasks = setup_rna_map_combine_tasks(df_single)
-        futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
+        futures = client.map(
+            lambda args: rna_map_combine_task(*args), rna_map_combine_tasks
+        )
         client.gather(futures)
         log.info("finished with rna_map_combine tasks")
     else:
