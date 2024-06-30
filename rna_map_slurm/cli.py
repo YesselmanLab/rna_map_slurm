@@ -35,6 +35,7 @@ from rna_map_slurm.generate_job import (
 from rna_map_slurm.jobs import get_user_jobs
 from rna_map_slurm.logger import get_logger, setup_logging
 from rna_map_slurm.parameters import get_default_parameters, get_parameters_from_file
+from rna_map_slurm.run_dask import dask_runner
 from rna_map_slurm.summaries import get_demultiplexing_summary, get_pop_avg_summary
 
 log = get_logger("CLI")
@@ -334,6 +335,21 @@ def run():
     end_time = time.time()
     elapsed_time = end_time - start_time
     log.info(f"Elapsed time: {elapsed_time:.2f} seconds")
+
+
+@time_it
+@cli.command()
+@click.argument("data_dirs", nargs=-1)
+@click.option(
+    "--num-workers", default=100, help="Number of workers to use.", required=True
+)
+@click.option(
+    "--num-splits", default=20, help="Number of splits to use.", required=True
+)
+@click.options("--debug", is_flag=True, help="Run in debug mode.")
+def run_dask(data_dirs, num_workers, num_splits, debug):
+    setup_logging()
+    dask_runner(data_dirs, num_workers, num_splits, debug)
 
 
 @cli.command()

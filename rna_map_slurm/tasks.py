@@ -150,6 +150,10 @@ class BasicTasks:
         shutil.rmtree("output/Mapping_Files")
         os.chdir(cur_dir)
 
+    @staticmethod
+    def rna_map_combine():
+        pass
+
 
 class IntDemultiplexTasks:
     """ """
