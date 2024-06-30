@@ -133,7 +133,7 @@ def setup_rna_map_tasks(df, params):
 def setup_rna_map_combine_tasks(df):
     tasks = []
     for i, row in df.iterrows():
-        tasks.append(row)
+        tasks.append([row.to_dict()])
     return tasks
 
 

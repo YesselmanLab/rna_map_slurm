@@ -160,7 +160,7 @@ class BasicTasks:
         os.chdir(cur_dir)
 
     @staticmethod
-    def rna_map_combine(row: pd.Series) -> None:
+    def rna_map_combine(row) -> None:
         barcode_seq = row["barcode_seq"]
         construct = row["construct"]
         run_path = "results/" + row["run_name"]
