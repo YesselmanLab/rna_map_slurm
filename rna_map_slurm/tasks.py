@@ -16,9 +16,10 @@ from rna_map.mutation_histogram import (
     write_mut_histos_to_pickle_file,
 )
 
-from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
 from rna_map_slurm.demultiplex import SabreDemultiplexer
+from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
 from rna_map_slurm.logger import get_logger
+from rna_map_slurm.rna_map_funcs import generate_pop_avg_plots, get_mut_histo_dataframe
 
 log = get_logger("TASKS")
 

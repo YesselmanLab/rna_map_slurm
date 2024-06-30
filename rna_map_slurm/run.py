@@ -140,38 +140,10 @@ def rna_map_combine(barcode_seq, rna_name):
     setup_logging()
     df = pd.read_csv("data.csv")
     row = get_data_row(df, barcode_seq, rna_name)
-    run_path = "results/" + row["run_name"]
-    dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
-    final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
-    log.info(f"results path: {final_path}")
-    os.makedirs(run_path, exist_ok=True)
-    os.makedirs(final_path, exist_ok=True)
-    dirs = glob.glob("data/split-*")
-    merged_mut_histos = None
-    count_files = 0
-    merged_mut_histos = {}
-    for d in dirs:
-        mhs_path = (
-            f"{d}/{barcode_seq}/{rna_name}/output/BitVector_Files/mutation_histos.p"
-        )
-        if not os.path.isfile(mhs_path):
-            log.warning("files not found:" + mhs_path)
-            continue
-        merge_mut_histo_dicts(
-            merged_mut_histos, get_mut_histos_from_pickle_file(mhs_path)
-        )
-        count_files += 1
-    log.info(f"merged {count_files} files")
-    df_results = get_mut_histo_dataframe(merged_mut_histos)
-    df_results["rna_name"] = rna_name
-    cols = list(row.keys())
-    for c in "demult_cmd,length".split(","):
-        cols.remove(c)
-    for c in cols:
-        df_results[c] = row[c]
-    df_results.to_json(final_path + "mutation_histos.json", orient="records")
-    generate_pop_avg_plots(df_results, row["run_name"], dir_name)
-    write_mut_histos_to_pickle_file(merged_mut_histos, final_path + "mutation_histos.p")
+    if row is None:
+        log.error(f"no barcode_seq {barcode_seq} with rna_name {rna_name} found")
+        return
+    BasicTasks.rna_map_combine(row)
 
 
 @time_it
