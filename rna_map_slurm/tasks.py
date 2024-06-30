@@ -162,7 +162,7 @@ class BasicTasks:
     @staticmethod
     def rna_map_combine(row: pd.Series) -> None:
         barcode_seq = row["barcode_seq"]
-        rna_name = row["rna_name"]
+        construct = row["construct"]
         run_path = "results/" + row["run_name"]
         dir_name = row["construct"] + "_" + row["code"] + "_" + row["data_type"]
         final_path = f"{run_path}/processed/{dir_name}/output/BitVector_Files/"
@@ -174,9 +174,7 @@ class BasicTasks:
         count_files = 0
         merged_mut_histos = {}
         for d in dirs:
-            mhs_path = (
-                f"{d}/{barcode_seq}/{rna_name}/output/BitVector_Files/mutation_histos.p"
-            )
+            mhs_path = f"{d}/{barcode_seq}/{construct}/output/BitVector_Files/mutation_histos.p"
             if not os.path.isfile(mhs_path):
                 log.warning("files not found:" + mhs_path)
                 continue
@@ -186,7 +184,6 @@ class BasicTasks:
             count_files += 1
         log.info(f"merged {count_files} files")
         df_results = get_mut_histo_dataframe(merged_mut_histos)
-        df_results["rna_name"] = rna_name
         cols = list(row.keys())
         for c in "demult_cmd,length".split(","):
             cols.remove(c)

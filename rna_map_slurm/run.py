@@ -135,13 +135,13 @@ def run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir):
 @time_it
 @cli.command()
 @click.argument("barcode_seq")
-@click.argument("rna_name")
-def rna_map_combine(barcode_seq, rna_name):
+@click.argument("construct")
+def rna_map_combine(barcode_seq, construct):
     setup_logging()
     df = pd.read_csv("data.csv")
-    row = get_data_row(df, barcode_seq, rna_name)
+    row = get_data_row(df, barcode_seq, construct)
     if row is None:
-        log.error(f"no barcode_seq {barcode_seq} with rna_name {rna_name} found")
+        log.error(f"no barcode_seq {barcode_seq} with construct {construct} found")
         return
     BasicTasks.rna_map_combine(row)
 
