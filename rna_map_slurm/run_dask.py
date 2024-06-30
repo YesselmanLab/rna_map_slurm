@@ -48,6 +48,12 @@ def rna_map_task(fa, r1_fastq, r2_fastq, csv, output_dir):
     return result
 
 
+def rna_map_combine_task(row):
+    result = BasicTasks.rna_map_combine(row)
+    time.sleep(1)
+    return result
+
+
 # setup tasks ################################################################
 
 
@@ -124,15 +130,23 @@ def setup_rna_map_tasks(df, params):
     return rna_map_tasks
 
 
+def setup_rna_map_combine_tasks(df):
+    tasks = []
+    for i, row in df.iterrows():
+        tasks.append(row)
+    return tasks
+
+
 # main func ########################################################################
 
 
-def dask_runner(data_dirs, num_workers, num_splits, debug):
+def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
     """
     main function for script
     """
     log.info("removing worker output files")
     os.system("rm -rf slurm-*")
+    log.info(f"start_stage = {start_step}")
     cluster = SLURMCluster(
         processes=1,
         cores=1,
@@ -158,30 +172,52 @@ def dask_runner(data_dirs, num_workers, num_splits, debug):
         all_pfqs.extend(get_paired_fastqs(d))
     params["num_dirs"] = params["num_splits"] * len(all_pfqs)
     # split fastq files ###############################################################
-    split_tasks = setup_split_fastq_file_tasks(all_pfqs, params)
-    log.info(f"currently {len(split_tasks)} split tasks")
-    futures = client.map(lambda args: split_fastq_file_task(*args), split_tasks)
-    client.gather(futures)
-    log.info("finished with splitting")
+    if start_step == 0:
+        split_tasks = setup_split_fastq_file_tasks(all_pfqs, params)
+        log.info(f"currently {len(split_tasks)} split tasks")
+        futures = client.map(lambda args: split_fastq_file_task(*args), split_tasks)
+        client.gather(futures)
+        log.info("finished with splitting")
+    else:
+        log.info("skipping split stage")
     # demultiplex  #####################################################################
-    demultiplex_tasks = setup_demultiplex_tasks(params)
-    log.info(f"currently {len(demultiplex_tasks)} demultiplex tasks")
-    futures = client.map(lambda args: demultiplex_task(*args), demultiplex_tasks)
-    client.gather(futures)
-    log.info("finished with demultiplexing")
+    if start_step <= 1:
+        demultiplex_tasks = setup_demultiplex_tasks(params)
+        log.info(f"currently {len(demultiplex_tasks)} demultiplex tasks")
+        futures = client.map(lambda args: demultiplex_task(*args), demultiplex_tasks)
+        client.gather(futures)
+        log.info("finished with demultiplexing")
+    else:
+        log.info("skipping demultiplex stage")
     # recombine fastq files  ###########################################################
-    df_single = pd.read_csv("csvs/data-single.csv")
-    barcodes = df_single["barcode_seq"].unique()
-    fastq_join_tasks = setup_join_fastq_files_tasks(barcodes)
-    log.info(f"currently {len(fastq_join_tasks)} fastq_join tasks")
-    futures = client.map(lambda args: demultiplex_task(*args), fastq_join_tasks)
-    client.gather(futures)
-    log.info("finished with joining fastq files")
+    if start_step <= 2:
+        df = pd.read_csv("csvs/data-single.csv")
+        barcodes = df["barcode_seq"].unique()
+        fastq_join_tasks = setup_join_fastq_files_tasks(barcodes)
+        log.info(f"currently {len(fastq_join_tasks)} fastq_join tasks")
+        futures = client.map(
+            lambda args: join_fastq_files_task(*args), fastq_join_tasks
+        )
+        client.gather(futures)
+        log.info("finished with joining fastq files")
+    else:
+        log.info("skipping join fastq stage")
     # run rna map ######################################################################
-    log.info(f"currently {len(rna_map_tasks)} rna_map tasks")
-    rna_map_tasks = setup_rna_map_tasks(df_single, params)
-    print(f"currently {len(rna_map_tasks)} rna_map tasks")
-    print(rna_map_tasks[0])
-    futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
-    client.gather(futures)
-    log.info("finished with rna_map tasks")
+    if start_step <= 3:
+        df_single = pd.read_csv("csvs/data-single.csv")
+        rna_map_tasks = setup_rna_map_tasks(df_single, params)
+        log.info(f"currently {len(rna_map_tasks)} rna_map tasks")
+        futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
+        client.gather(futures)
+        log.info("finished with rna_map tasks")
+    else:
+        log.info("skipping rna_map stage")
+    # run rna map combine ##############################################################
+    if start_step <= 4:
+        df_single = pd.read_csv("csvs/data-single.csv")
+        rna_map_combine_tasks = setup_rna_map_combine_tasks(df_single)
+        futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
+        client.gather(futures)
+        log.info("finished with rna_map_combine tasks")
+    else:
+        log.info("skipping rna_map_combine stage")

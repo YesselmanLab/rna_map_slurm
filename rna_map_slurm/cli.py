@@ -346,10 +346,13 @@ def run():
 @click.option(
     "--num-splits", default=20, help="Number of splits to use.", required=True
 )
+@click.option(
+    "--start-step", default=0, type=int, help="Start at a specific job.", required=False
+)
 @click.option("--debug", is_flag=True, help="Run in debug mode.")
-def run_dask(data_dirs, num_workers, num_splits, debug):
+def run_dask(data_dirs, num_workers, num_splits, start_step, debug):
     setup_logging()
-    dask_runner(data_dirs, num_workers, num_splits, debug)
+    dask_runner(data_dirs, num_workers, num_splits, start_step, debug)
 
 
 @cli.command()
