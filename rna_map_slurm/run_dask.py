@@ -37,9 +37,14 @@ def join_fastq_files_task(fastq_files, joined_fastq):
     return joined_fastq
 
 
-def rna_map_task(r1_fastq, r2_fastq, fa, csv, output_dir):
-    result = BasicTasks.rna_map(r1_fastq, r2_fastq, fa, csv, output_dir)
-    time.sleep(2)
+def rna_map_task(fa, r1_fastq, r2_fastq, csv, output_dir):
+    result = None
+    try:
+        result = BasicTasks.rna_map(fa, r1_fastq, r2_fastq, csv, output_dir)
+    except Exception as e:
+        log.error("rna_map_task raised an exception")
+        log.error("An error occurred", exc_info=True)
+    time.sleep(1)
     return result
 
 
@@ -50,10 +55,20 @@ def setup_split_fastq_file_tasks(all_pfqs, params):
     split_tasks = []
     for i, pfq in enumerate(all_pfqs):
         split_tasks.append(
-            [pfq.r1, os.path.abspath("data"), params["num_splits"], i * num_splits]
+            [
+                pfq.read_1.path,
+                os.path.abspath("data"),
+                params["num_splits"],
+                i * params["num_splits"],
+            ]
         )
         split_tasks.append(
-            [pfq.r2, os.path.abspath("data"), params["num_splits"], i * num_splits]
+            [
+                pfq.read_2.path,
+                os.path.abspath("data"),
+                params["num_splits"],
+                i * params["num_splits"],
+            ]
         )
     return split_tasks
 
@@ -67,8 +82,8 @@ def setup_demultiplex_tasks(params):
         demultiplex_tasks.append(
             [
                 os.path.abspath("data.csv"),
-                os.path.abspath(f"{split_dir}/test_R1.fastq.gz"),
-                os.path.abspath(f"{split_dir}/test_R2.fastq.gz"),
+                f"{split_dir}/test_R1.fastq.gz",
+                f"{split_dir}/test_R2.fastq.gz",
                 split_dir,
             ]
         )
@@ -95,13 +110,13 @@ def setup_rna_map_tasks(df, params):
         dot_bracket_path = os.path.abspath(f"inputs/rnas/{row['code']}.csv")
         for split_dir in split_dirs:
             fastq_dir = os.path.abspath(f"{split_dir}/{row['barcode_seq']}")
-            output_dir = f"rna_map/{row['construct']}"
+            output_dir = f"{fastq_dir}/{row['construct']}"
             os.makedirs(output_dir, exist_ok=True)
             rna_map_tasks.append(
                 [
+                    fa_path,
                     f"{fastq_dir}/test_R1.fastq.gz",
                     f"{fastq_dir}/test_R2.fastq.gz",
-                    fa_path,
                     dot_bracket_path,
                     output_dir,
                 ]
@@ -115,7 +130,9 @@ def setup_rna_map_tasks(df, params):
 def dask_runner(data_dirs, num_workers, num_splits, debug):
     """
     main function for script
-    """
+    """ 
+    log.info("removing worker output files")
+    os.system("rm -rf slurm-*")
     cluster = SLURMCluster(
         processes=1,
         cores=1,
@@ -139,7 +156,7 @@ def dask_runner(data_dirs, num_workers, num_splits, debug):
     for d in data_dirs:
         d = os.path.abspath(d)
         all_pfqs.extend(get_paired_fastqs(d))
-    params["num_dirs"] = len(all_pfqs) * len(all_pfqs)
+    params["num_dirs"] = params["num_splits"] * len(all_pfqs)
     # split fastq files ###############################################################
     split_tasks = setup_split_fastq_file_tasks(all_pfqs, params)
     log.info(f"currently {len(split_tasks)} split tasks")
@@ -157,11 +174,14 @@ def dask_runner(data_dirs, num_workers, num_splits, debug):
     barcodes = df_single["barcode_seq"].unique()
     fastq_join_tasks = setup_join_fastq_files_tasks(barcodes)
     print(f"currently {len(fastq_join_tasks)} fastq_join tasks")
-    futures = client.map(lambda args: demultiplex_task(*args), fastq_join_tasks)
+    futures = client.map(lambda args: join_fastq_files_task(*args), fastq_join_tasks)
     client.gather(futures)
+    log.info("finished with joining fastq files")
     # run rna map ######################################################################
-    print(f"currently {len(rna_map_tasks)} rna_map tasks")
     rna_map_tasks = setup_rna_map_tasks(df_single, params)
+    print(f"currently {len(rna_map_tasks)} rna_map tasks")
+    print(rna_map_tasks[0])
     futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
     client.gather(futures)
     print("finished with rna_map tasks")
+    print("DONE #####################################################################")
