@@ -130,7 +130,7 @@ def setup_rna_map_tasks(df, params):
 def dask_runner(data_dirs, num_workers, num_splits, debug):
     """
     main function for script
-    """ 
+    """
     log.info("removing worker output files")
     os.system("rm -rf slurm-*")
     cluster = SLURMCluster(
@@ -173,15 +173,15 @@ def dask_runner(data_dirs, num_workers, num_splits, debug):
     df_single = pd.read_csv("csvs/data-single.csv")
     barcodes = df_single["barcode_seq"].unique()
     fastq_join_tasks = setup_join_fastq_files_tasks(barcodes)
-    print(f"currently {len(fastq_join_tasks)} fastq_join tasks")
-    futures = client.map(lambda args: join_fastq_files_task(*args), fastq_join_tasks)
+    log.info(f"currently {len(fastq_join_tasks)} fastq_join tasks")
+    futures = client.map(lambda args: demultiplex_task(*args), fastq_join_tasks)
     client.gather(futures)
     log.info("finished with joining fastq files")
     # run rna map ######################################################################
+    log.info(f"currently {len(rna_map_tasks)} rna_map tasks")
     rna_map_tasks = setup_rna_map_tasks(df_single, params)
     print(f"currently {len(rna_map_tasks)} rna_map tasks")
     print(rna_map_tasks[0])
     futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
     client.gather(futures)
-    print("finished with rna_map tasks")
-    print("DONE #####################################################################")
+    log.info("finished with rna_map tasks")
