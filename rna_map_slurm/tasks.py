@@ -198,3 +198,7 @@ class BasicTasks:
 
 class IntDemultiplexTasks:
     """ """
+
+    @staticmethod
+    def int_demultiplex():
+        pass
