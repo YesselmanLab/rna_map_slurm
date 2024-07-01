@@ -238,7 +238,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         log.info("skipping demultiplex stage")
     # recombine fastq files  ###########################################################
     if start_step <= 2:
-        df = pd.read_csv("csvs/data-single.csv")
+        df = pd.read_csv("data.csv")
         barcodes = df["barcode_seq"].unique()
         fastq_join_tasks = setup_join_fastq_files_tasks(barcodes)
         log.info(f"currently {len(fastq_join_tasks)} fastq_join tasks")
@@ -251,7 +251,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         log.info("skipping join fastq stage")
     # run rna map ######################################################################
     if start_step <= 3:
-        df_single = pd.read_csv("csvs/data-single.csv")
+        df = pd.read_csv("csvs/data-single.csv")
         rna_map_tasks = setup_rna_map_tasks(df_single, params)
         log.info(f"currently {len(rna_map_tasks)} rna_map tasks")
         futures = client.map(lambda args: rna_map_task(*args), rna_map_tasks)
