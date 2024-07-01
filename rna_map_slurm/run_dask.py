@@ -268,7 +268,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
             log.info("running in debug mode, limiting int_demultiplex tasks to 10")
             int_demultiplex_tasks = int_demultiplex_tasks[0:10]
         futures = client.map(
-            lambda args: setup_int_demultiplex_tasks(*args),
+            lambda args: int_demultiplex_task(*args),
             int_demultiplex_tasks,
         )
         client.gather(futures)
