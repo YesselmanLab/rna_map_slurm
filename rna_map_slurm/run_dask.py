@@ -162,7 +162,7 @@ def setup_int_demultiplex_tasks(df):
             barcode_row = group.iloc[0]
             bb1 = barcode_row["barcode_bounds"][0][0]
             bb2 = barcode_row["barcode_bounds"][0][1]
-            end_len = len(row["sequence"])
+            end_len = len(barcode_row["sequence"])
             max_len = end_len - bb2[0]
             min_len = end_len - bb2[1]
             bb2 = [min_len, max_len]
