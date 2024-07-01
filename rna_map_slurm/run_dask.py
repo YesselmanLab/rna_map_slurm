@@ -158,7 +158,7 @@ def setup_int_demultiplex_tasks(df):
     for _, row in df.iterrows():
         os.makedirs(f"int-demultiplexed/{row['barcode_seq']}", exist_ok=True)
         df_barcodes = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
-        for _, group in df_barcodes.iterrows():
+        for _, group in df_barcodes.groupby("full_barcode"):
             barcode_row = group.iloc[0]
             bb1 = barcode_row["barcode_bounds"][0][0]
             bb2 = barcode_row["barcode_bounds"][0][1]
