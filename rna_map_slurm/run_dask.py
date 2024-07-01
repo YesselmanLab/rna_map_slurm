@@ -170,7 +170,7 @@ def setup_int_demultiplex_tasks(df):
             b2_seq = barcode_row["barcodes"][0][1]
             tasks.append(
                 [
-                    row["construct_barcode"],
+                    row["barcode_seq"],
                     b1_seq,
                     b2_seq,
                     bb1[0],
