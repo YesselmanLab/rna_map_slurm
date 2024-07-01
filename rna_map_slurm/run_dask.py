@@ -54,6 +54,22 @@ def rna_map_combine_task(row):
     return result
 
 
+def int_demultiplex_task(
+    construct_barcode, b1_seq, b2_seq, b1_min_pos, b1_max_pos, b2_min_pos, b2_max_pos
+):
+    result = IntDemultiplexTasks.int_demultiplex(
+        construct_barcode,
+        b1_seq,
+        b2_seq,
+        b1_min_pos,
+        b1_max_pos,
+        b2_min_pos,
+        b2_max_pos,
+    )
+    time.sleep(1)
+    return result
+
+
 # setup tasks ################################################################
 
 
@@ -137,6 +153,35 @@ def setup_rna_map_combine_tasks(df):
     return tasks
 
 
+def setup_int_demultiplex_tasks(df):
+    tasks = []
+    for _, row in df.iterrows():
+        os.makedirs(f"int-demultiplexed/{row['barcode_seq']}", exist_ok=True)
+        df_barcodes = pd.read_json(f"inputs/barcode_jsons/{row['code']}.json")
+        for _, group in df_barcodes.iterrows():
+            barcode_row = group.iloc[0]
+            bb1 = barcode_row["barcode_bounds"][0][0]
+            bb2 = barcode_row["barcode_bounds"][0][1]
+            end_len = len(row["sequence"])
+            max_len = end_len - bb2[0]
+            min_len = end_len - bb2[1]
+            bb2 = [min_len, max_len]
+            b1_seq = barcode_row["barcodes"][0][0]
+            b2_seq = barcode_row["barcodes"][0][1]
+            tasks.append(
+                [
+                    row["construct_barcode"],
+                    b1_seq,
+                    b2_seq,
+                    bb1[0],
+                    bb1[1],
+                    bb2[0],
+                    bb2[1],
+                ]
+            )
+    return tasks
+
+
 # main func ########################################################################
 
 
@@ -144,6 +189,8 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
     """
     main function for script
     """
+    if debug:
+        log.info("running in debug mode")
     log.info("removing worker output files")
     os.system("rm -rf slurm-*")
     log.info(f"start_stage = {start_step}")
@@ -212,8 +259,24 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         log.info("finished with rna_map tasks")
     else:
         log.info("skipping rna_map stage")
-    # run rna map combine ##############################################################
+    # run int demultiplex ##############################################################
     if start_step <= 4:
+        df = pd.read_csv("csvs/data.csv")
+        int_demultiplex_tasks = setup_int_demultiplex_tasks(df)
+        log.info(f"currently {len(int_demultiplex_tasks)} int_demultiplex tasks")
+        if debug:
+            log.info("running in debug mode, limiting int_demultiplex tasks to 10")
+            int_demultiplex_tasks = int_demultiplex_tasks[0:10]
+        futures = client.map(
+            lambda args: setup_int_demultiplex_tasks(*args),
+            int_demultiplex_tasks,
+        )
+        client.gather(futures)
+        log.info("finished with int_demultiplex tasks")
+    else:
+        log.info("skipping int_demultiplex stage")
+    # run rna map combine ##############################################################
+    if start_step <= 5:
         df_single = pd.read_csv("csvs/data-single.csv")
         rna_map_combine_tasks = setup_rna_map_combine_tasks(df_single)
         futures = client.map(
