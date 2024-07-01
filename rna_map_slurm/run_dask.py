@@ -201,7 +201,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         walltime="5:00:00",
         job_script_prologue=[
             "#!/bin/bash",
-            "module load bowtie/2.3 trim_galore fastqc anaconda",
+            "module load bowtie/2.3 trim_galore fastqc anaconda seqkit",
             "conda activate",
             "conda activate dask",
         ],

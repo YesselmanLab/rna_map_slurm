@@ -240,3 +240,7 @@ class IntDemultiplexTasks:
         os.system(
             f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
         )
+
+    @staticmethod
+    def int_demultiplex_rna_map():
+        pass
