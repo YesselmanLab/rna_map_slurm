@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from fastqsplitter import split_fastqs as fastqsplitter
 
+from seq_tools.sequence import get_reverse_complement
 from rna_map.parameters import get_preset_params
 import rna_map
 from rna_map.mutation_histogram import (
@@ -20,6 +21,7 @@ from rna_map_slurm.demultiplex import SabreDemultiplexer
 from rna_map_slurm.fastq import PairedFastqFiles, FastqFile
 from rna_map_slurm.logger import get_logger
 from rna_map_slurm.rna_map_funcs import generate_pop_avg_plots, get_mut_histo_dataframe
+from rna_map_slurm.util import get_data_row, get_file_size, random_string
 
 log = get_logger("TASKS")
 
@@ -200,5 +202,41 @@ class IntDemultiplexTasks:
     """ """
 
     @staticmethod
-    def int_demultiplex():
-        pass
+    def int_demultiplex(
+        construct_barcode,
+        b1_seq,
+        b2_seq,
+        b1_min_pos,
+        b1_max_pos,
+        b2_min_pos,
+        b2_max_pos,
+    ) -> None:
+        tmp_dir = "/scratch/" + random_string(10)
+        log.info(f"tmp_dir: {tmp_dir}")
+        os.makedirs(tmp_dir, exist_ok=True)
+        r2_path = f"demultiplexed/{construct_barcode}/test_R2.fastq.gz"
+        r1_path = f"demultiplexed/{construct_barcode}/test_R1.fastq.gz"
+        b2_seq_rc = get_reverse_complement(b2_seq)
+        os.system(
+            f'seqkit grep -s -p "{b1_seq}" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz'
+        )
+        os.system(
+            f'seqkit grep -s -p "{b2_seq_rc}" -P -R {b2_min_pos-2}:{b2_max_pos+2} {r1_path} -o {tmp_dir}/test_R1.fastq.gz'
+        )
+        os.system(f"seqkit seq -n {tmp_dir}/test_R2.fastq.gz > {tmp_dir}/R2_names.txt")
+        os.system(f"seqkit seq -n {tmp_dir}/test_R1.fastq.gz > {tmp_dir}/R1_names.txt")
+        os.system(f"sort {tmp_dir}/R1_names.txt > {tmp_dir}/R1_names_sorted.txt")
+        os.system(f"sort {tmp_dir}/R2_names.txt > {tmp_dir}/R2_names_sorted.txt")
+        cmd = (
+            "awk 'NR==FNR{a[$1]; next} $1 in a' "
+            + f"{tmp_dir}/R1_names_sorted.txt {tmp_dir}/R2_names_sorted.txt "
+            + "| awk '{print($1)}' >"
+            + f"{tmp_dir}/common_names.txt"
+        )
+        os.system(cmd)
+        os.system(
+            f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz"
+        )
+        os.system(
+            f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
+        )

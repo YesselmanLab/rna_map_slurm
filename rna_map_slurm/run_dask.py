@@ -10,7 +10,7 @@ from dask_jobqueue import SLURMCluster
 from barcode_demultiplex.demultiplex import find_helix_barcodes
 
 from rna_map_slurm.logger import setup_logging, get_logger
-from rna_map_slurm.tasks import BasicTasks
+from rna_map_slurm.tasks import BasicTasks, IntDemultiplexTasks
 from rna_map_slurm.fastq import get_paired_fastqs
 
 

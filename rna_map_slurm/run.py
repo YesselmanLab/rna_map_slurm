@@ -27,7 +27,7 @@ from rna_map.parameters import get_preset_params
 # Current application imports
 from rna_map_slurm.logger import get_logger, setup_logging
 from rna_map_slurm.plotting import plot_pop_avg_from_row
-from rna_map_slurm.tasks import BasicTasks
+from rna_map_slurm.tasks import BasicTasks, IntDemultiplexTasks
 from rna_map_slurm.util import get_data_row, get_file_size, random_string
 
 log = get_logger("CLI")
@@ -187,34 +187,14 @@ def int_demultiplex(
     construct_barcode, b1_seq, b2_seq, b1_min_pos, b1_max_pos, b2_min_pos, b2_max_pos
 ):
     setup_logging()
-    tmp_dir = "/scratch/" + random_string(10)
-    print(tmp_dir)
-    os.makedirs(tmp_dir, exist_ok=True)
-    r2_path = f"demultiplexed/{construct_barcode}/test_R2.fastq.gz"
-    r1_path = f"demultiplexed/{construct_barcode}/test_R1.fastq.gz"
-    b2_seq_rc = get_reverse_complement(b2_seq)
-    os.system(
-        f'seqkit grep -s -p "{b1_seq}" -P -R {b1_min_pos-2}:{b1_max_pos+2} {r2_path} -o {tmp_dir}/test_R2.fastq.gz'
-    )
-    os.system(
-        f'seqkit grep -s -p "{b2_seq_rc}" -P -R {b2_min_pos-2}:{b2_max_pos+2} {r1_path} -o {tmp_dir}/test_R1.fastq.gz'
-    )
-    os.system(f"seqkit seq -n {tmp_dir}/test_R2.fastq.gz > {tmp_dir}/R2_names.txt")
-    os.system(f"seqkit seq -n {tmp_dir}/test_R1.fastq.gz > {tmp_dir}/R1_names.txt")
-    os.system(f"sort {tmp_dir}/R1_names.txt > {tmp_dir}/R1_names_sorted.txt")
-    os.system(f"sort {tmp_dir}/R2_names.txt > {tmp_dir}/R2_names_sorted.txt")
-    cmd = (
-        "awk 'NR==FNR{a[$1]; next} $1 in a' "
-        + f"{tmp_dir}/R1_names_sorted.txt {tmp_dir}/R2_names_sorted.txt "
-        + "| awk '{print($1)}' >"
-        + f"{tmp_dir}/common_names.txt"
-    )
-    os.system(cmd)
-    os.system(
-        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R2.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate1.fastq.gz"
-    )
-    os.system(
-        f"seqkit grep -f {tmp_dir}/common_names.txt {tmp_dir}/test_R1.fastq.gz -o int-demultiplexed/{construct_barcode}/{b1_seq}_{b2_seq}_mate2.fastq.gz"
+    IntDemultiplexTasks.int_demultiplex(
+        construct_barcode,
+        b1_seq,
+        b2_seq,
+        b1_min_pos,
+        b1_max_pos,
+        b2_min_pos,
+        b2_max_pos,
     )
 
 
