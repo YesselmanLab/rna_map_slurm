@@ -261,7 +261,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         log.info("skipping rna_map stage")
     # run int demultiplex ##############################################################
     if start_step <= 4:
-        df = pd.read_csv("csvs/data.csv")
+        df = pd.read_csv("csvs/data-int_multiplex.csv")
         int_demultiplex_tasks = setup_int_demultiplex_tasks(df)
         log.info(f"currently {len(int_demultiplex_tasks)} int_demultiplex tasks")
         if debug:
@@ -275,6 +275,7 @@ def dask_runner(data_dirs, num_workers, num_splits, start_step, debug):
         log.info("finished with int_demultiplex tasks")
     else:
         log.info("skipping int_demultiplex stage")
+    exit()
     # run rna map combine ##############################################################
     if start_step <= 5:
         df_single = pd.read_csv("csvs/data-single.csv")
