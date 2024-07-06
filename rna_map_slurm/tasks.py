@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastqsplitter import split_fastqs as fastqsplitter
 
 from seq_tools.sequence import get_reverse_complement
-from rna_map.parameters import get_preset_params
+from rna_map.parameters import get_preset_params, parse_parameters_from_file
 import rna_map
 from rna_map.mutation_histogram import (
     get_dataframe,
@@ -148,7 +148,11 @@ class BasicTasks:
         if os.path.isfile("input.csv"):
             log.info("Using existing input.csv file")
             csv_path = "input.csv"
-        params = get_preset_params("barcoded-library")
+        if os.path.isfile("params.yml"):
+            log.info("Using existing parameter fileparams.yml file")
+            params = parse_parameters_from_file("params.yml")
+        else:
+            params = get_preset_params("barcoded-library")
         params["overwrite"] = True
         # TODO do I want to do this?
         params["bit_vector"]["summary_output_only"] = True
