@@ -149,7 +149,7 @@ class BasicTasks:
             log.info("Using existing input.csv file")
             csv_path = "input.csv"
         if os.path.isfile("params.yml"):
-            log.info("Using existing parameter fileparams.yml file")
+            log.info("Using existing parameter file params.yml file")
             params = parse_parameters_from_file("params.yml")
         else:
             params = get_preset_params("barcoded-library")
