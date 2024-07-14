@@ -7,7 +7,7 @@ from tabulate import tabulate
 from rna_map_slurm.fastq import PairedFastqFiles
 from rna_map_slurm.logger import get_logger
 
-log = get_logger(__name__)
+log = get_logger("demultiplex")
 
 
 class SabreDemultiplexer:

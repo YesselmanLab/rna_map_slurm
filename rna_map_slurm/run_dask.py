@@ -14,7 +14,7 @@ from rna_map_slurm.tasks import BasicTasks, IntDemultiplexTasks
 from rna_map_slurm.fastq import get_paired_fastqs
 
 
-log = get_logger("RUN-DASK")
+log = get_logger("run-dask")
 
 # dask tasks ##################################################################
 

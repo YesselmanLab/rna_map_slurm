@@ -8,7 +8,7 @@ from rna_map_slurm.logger import get_logger
 from rna_map_slurm.jobs import SlurmOptions, get_job_header, generate_submit_file
 from rna_map_slurm.fastq import get_paired_fastqs, PairedFastqFiles
 
-log = get_logger("GENERATE-JOBS")
+log = get_logger("generate-jobs")
 
 
 def split_into_n(df, n):

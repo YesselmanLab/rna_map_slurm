@@ -38,7 +38,7 @@ from rna_map_slurm.parameters import get_default_parameters, get_parameters_from
 from rna_map_slurm.run_dask import dask_runner
 from rna_map_slurm.summaries import get_demultiplexing_summary, get_pop_avg_summary
 
-log = get_logger("CLI")
+log = get_logger("cli")
 
 
 def time_it(func: Callable) -> Callable:
@@ -205,6 +205,11 @@ def setup_input_files(df, seq_path):
         for i in range(0, len(args)):
             if args[i] == "--helix" or args[i] == "-helix":
                 helices.append([int(args[i + 1]), int(args[i + 2]), int(args[i + 3])])
+        if len(helices) == 0:
+            log.error(
+                f"trying to setup demultiplexing on {row['code']} but no helices are supplied!!"
+            )
+            continue
         df_barcodes = find_helix_barcodes(df_seq, helices)
         df_barcodes.to_json(
             f"inputs/barcode_jsons/{row['code']}.json", orient="records"
