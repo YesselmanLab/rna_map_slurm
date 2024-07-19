@@ -29,6 +29,7 @@ from rna_map_slurm.logger import get_logger, setup_logging
 from rna_map_slurm.plotting import plot_pop_avg_from_row
 from rna_map_slurm.tasks import BasicTasks, IntDemultiplexTasks
 from rna_map_slurm.util import get_data_row, get_file_size, random_string
+from rna_map_slurm.rna_map_funcs import get_mut_histo_dataframe, generate_pop_avg_plots
 
 log = get_logger("CLI")
 

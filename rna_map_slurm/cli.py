@@ -90,7 +90,7 @@ def replace_spaces_warn(df, column_name):
     return df
 
 
-def format_sequencing_run_info(df: pd.DataFrame):
+def format_sequencing_run_info(df: pd.DataFrame) -> pd.DataFrame:
     """
     Formats the sequencing run information.
 
@@ -463,7 +463,7 @@ def deposit_results(version, path, overwrite):
     data_dirs = None
     with open(log_file_path, "r") as log_file:
         for line in log_file:
-            match = re.match(r"^RNA-MAP-SLURM\.CLI - INFO - data_dirs: \((.*)\)", line)
+            match = re.match(r"^rna-map-slurm\.cli - INFO - data_dirs: \((.*)\)", line)
             if match:
                 data_dirs = match.group(1).split(",")[:1]
                 break
