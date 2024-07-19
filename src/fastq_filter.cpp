@@ -6,6 +6,15 @@
 #include <pybind11/pybind11.h>
 
 
+/**
+ * Checks if a given sequence contains a subsequence within a specified range.
+ *
+ * @param sequence The sequence to search within.
+ * @param subsequence The subsequence to search for.
+ * @param start The starting index of the range (inclusive).
+ * @param end The ending index of the range (inclusive).
+ * @return True if the subsequence is found within the range, false otherwise.
+ */
 bool containsSubsequence(const std::string& sequence, const std::string& subsequence, int start, int end) {
     if (sequence.length() < end) return false;
     for (int i = start - 1; i <= end; ++i) {
@@ -16,6 +25,19 @@ bool containsSubsequence(const std::string& sequence, const std::string& subsequ
     return false;
 }
 
+/**
+ * Processes two FASTQ files and filters the reads based on specified criteria.
+ *
+ * @param inputFile1 The path to the first input FASTQ file.
+ * @param inputFile2 The path to the second input FASTQ file.
+ * @param output_dir The directory where the filtered output FASTQ files will be saved.
+ * @param barcode1 The barcode sequence to match in the first read.
+ * @param start1 The starting position of the barcode sequence in the first read.
+ * @param end1 The ending position of the barcode sequence in the first read.
+ * @param barcode2 The barcode sequence to match in the second read.
+ * @param start2 The starting position of the barcode sequence in the second read.
+ * @param end2 The ending position of the barcode sequence in the second read.
+ */
 void processFastqFiles(const char* inputFile1, const char* inputFile2, const std::string& output_dir, 
                        const std::string& barcode1, int start1, int end1, 
                        const std::string& barcode2, int start2, int end2) {
@@ -69,6 +91,13 @@ void processFastqFiles(const char* inputFile1, const char* inputFile2, const std
 
 namespace py = pybind11;
 
+/**
+ * @brief Binds C++ functions to Python using Pybind11.
+ *
+ * This function is used to create a Python module and bind C++ functions to it using Pybind11.
+ *
+ * @param m The Python module object.
+ */
 PYBIND11_MODULE(cpp, m) {
     m.def("process_fastq_files", &processFastqFiles, "A function to process FASTQ files");
 }
