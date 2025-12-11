@@ -1,0 +1,50 @@
+name: rna_map_slurm
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # Python version
+  - python>=3.10
+
+  # Core scientific packages
+  - pandas>=1.5
+  - numpy>=1.20
+  - matplotlib>=3.5
+  - pyyaml>=6.0
+
+  # CLI and utilities
+  - click>=8.0
+  - tabulate>=0.9
+
+  # Bioinformatics tools (from bioconda)
+  - seqkit
+  - sabre
+  - trim-galore
+
+  # Development tools
+  - pip
+
+  # Install package and optional dependencies via pip
+  - pip:
+      # Install this package in editable mode
+      - -e .
+
+      # Development dependencies
+      - pytest>=7.0
+      - pytest-cov>=4.0
+      - pytest-mock>=3.10
+      - ruff>=0.1.0
+      - mypy>=1.0
+      - pandas-stubs
+      - types-PyYAML
+      - types-tabulate
+
+      # Lab-specific packages (install from GitHub or local)
+      # Uncomment these if you have access to the lab packages:
+      # - git+https://github.com/jyesselm/rna_map.git
+      # - git+https://github.com/jyesselm/barcode_demultiplex.git
+      # - git+https://github.com/jyesselm/fastqsplitter.git
+      # - git+https://github.com/jyesselm/seq_tools.git
+      # - git+https://github.com/jyesselm/gsheets.git
