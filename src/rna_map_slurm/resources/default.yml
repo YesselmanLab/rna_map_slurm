@@ -1,0 +1,96 @@
+# RNA Map SLURM Configuration
+
+# Number of chunks to split each FASTQ file into
+fastq_chunks: 100
+
+# Path configuration
+paths:
+  log: "logs"
+  jobs: "jobs"
+  submits: "submits"
+  inputs: "inputs"
+  tmp: "/scratch"  # Temporary directory for scratch space (cluster-dependent)
+  seq_path: ""     # Path to sequence data (can also use SEQPATH env var)
+
+# Construct handling options
+construct_options:
+  # Constructs with more sequences than this threshold
+  # will get their own dedicated SLURM job instead of being batched
+  large_construct_threshold: 100
+
+# Number of tasks to batch per SLURM job
+tasks_per_job:
+  default: 1
+  split-fastq: 1
+  demultiplex: 10
+  trim-galore: 10
+  join-fastq-files: 1
+  rna-map: 25
+  int-demultiplex: 10
+  int-demultiplex-rna-map: 25
+  int-demultiplex-rna-map-combine: 1
+
+# SLURM job resource configuration
+slurm_options:
+  # Additional SBATCH directives to include in all jobs
+  extra-header-cmds: ""
+
+  # Default options used if job type not specified
+  default:
+    time: "6:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # FASTQ splitting (high memory for large files)
+  split-fastq:
+    time: "04:00:00"
+    cpus-per-task: 8
+    mem-per-cpu: 64GB
+
+  # Trim Galore adapter trimming
+  trim-galore:
+    time: "04:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Barcode demultiplexing
+  demultiplex:
+    time: "04:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Internal barcode demultiplexing
+  int-demultiplex:
+    time: "12:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Join FASTQ files across chunks
+  join-fastq-files:
+    time: "12:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 4GB
+
+  # RNA mapping
+  rna-map:
+    time: "6:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Combine RNA mapping results
+  rna-map-combine:
+    time: "6:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Internal demultiplex RNA mapping
+  int-demultiplex-rna-map:
+    time: "2:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
+
+  # Combine internal demultiplex RNA mapping results
+  int-demultiplex-rna-map-combine:
+    time: "2:00:00"
+    cpus-per-task: 1
+    mem-per-cpu: 2GB
