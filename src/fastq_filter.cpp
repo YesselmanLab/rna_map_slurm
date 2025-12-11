@@ -99,5 +99,24 @@ namespace py = pybind11;
  * @param m The Python module object.
  */
 PYBIND11_MODULE(cpp, m) {
-    m.def("process_fastq_files", &processFastqFiles, "A function to process FASTQ files");
+    m.doc() = "Python bindings for processing FASTQ files using C++";  // Optional module docstring
+
+    m.def("process_fastq_files", &processFastqFiles, 
+          R"pbdoc(
+            Process two FASTQ files and filter reads based on barcode matching.
+
+            Parameters:
+            inputFile1 (str): Path to the first input FASTQ file.
+            inputFile2 (str): Path to the second input FASTQ file.
+            output_dir (str): Directory where the filtered output files will be saved.
+            barcode1 (str): Barcode sequence to match in the first read.
+            start1 (int): Starting position of the barcode in the first read.
+            end1 (int): Ending position of the barcode in the first read.
+            barcode2 (str): Barcode sequence to match in the second read.
+            start2 (int): Starting position of the barcode in the second read.
+            end2 (int): Ending position of the barcode in the second read.
+
+            Returns:
+            None.
+          )pbdoc");
 }

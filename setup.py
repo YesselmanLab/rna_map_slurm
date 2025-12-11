@@ -56,7 +56,6 @@ setup(
     package_dir={"rna_map_slurm": "rna_map_slurm"},
     py_modules=[
         "rna_map_slurm/cli",
-        "rna_map_slurm/cpp",
         "rna_map_slurm/demultiplex",
         "rna_map_slurm/fastq",
         "rna_map_slurm/generate_job",

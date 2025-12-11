@@ -1,8 +1,11 @@
 import os
 import subprocess
 import pandas as pd
-from typing import List
+import numpy as np
+from typing import List, Tuple
 from tabulate import tabulate
+
+from rna_library import SecStruct
 
 from rna_map_slurm.fastq import PairedFastqFiles
 from rna_map_slurm.logger import get_logger
@@ -121,3 +124,68 @@ class SabreDemultiplexer:
         missing_columns = [col for col in columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
+
+
+# int demultiplexing ##############################################
+
+
+def find_helix_barcodes(
+    df: pd.DataFrame, helices: List[Tuple[int, int, int]]
+) -> pd.DataFrame:
+    """
+    Finds the sequence and bounds of helix barcodes in a dataframe of sequences and structures.
+
+    Args:
+        df: A dataframe with columns "sequence" and "structure".
+        helices: A list of tuples of the form (helix_index, start_pos, end_pos).
+
+    Returns:
+        A dataframe with the same columns as the input, plus the columns barcodes,
+        barcode_bounds, and full_barcode.
+    """
+    if len(helices) > 1:
+        raise ValueError("only supporting one helix now! Will be changed soon!!")
+
+    def __get_subsection(h1: str, h2: str, pos1: int, pos2: int) -> List[str]:
+        """
+        Get a subsection of two strings based on the given positions.
+
+        Args:
+            h1 (str): The first string.
+            h2 (str): The second string.
+            pos1 (int): The starting position of the subsection.
+            pos2 (int): The ending position of the subsection.
+
+        Returns:
+            List[str]: A list containing the subsections of h1 and h2.
+
+        """
+        h1_new = h1[pos1 : pos2 + 1]
+        h2_new = h2[::-1][pos1 : pos2 + 1][::-1]
+        return [h1_new, h2_new]
+
+    df["barcodes"] = [[] for _ in range(len(df))]
+    df["barcode_bounds"] = [[] for _ in range(len(df))]
+    df["full_barcode"] = ""
+    for i, row in df.iterrows():
+        s = SecStruct(row["sequence"].replace("U", "T"), row["structure"])
+        row_helices = list(s.get_helices())
+        all_barcodes = []
+        all_bounds = []
+        for j, h in enumerate(helices):
+            row_h = row_helices[h[0]]
+            seqs = row_h.sequence.split("&")
+            strands = row_h.strands
+            b_seq = __get_subsection(seqs[0], seqs[1], h[1], h[2])
+            b_strands = __get_subsection(strands[0], strands[1], h[1], h[2])
+            b_bounds = [
+                [min(b_strands[0]), max(b_strands[0])],
+                [min(b_strands[1]), max(b_strands[1])],
+            ]
+            all_barcodes.append(b_seq)
+            all_bounds.append(b_bounds)
+        full_barcode = "_".join(np.concatenate(all_barcodes).flat)
+        df.at[i, "barcodes"] = all_barcodes
+        df.at[i, "barcode_bounds"] = all_bounds
+        df.at[i, "full_barcode"] = full_barcode
+    return df
