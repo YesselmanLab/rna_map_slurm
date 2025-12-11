@@ -13,23 +13,38 @@ dependencies:
   - numpy>=1.20
   - matplotlib>=3.5
   - pyyaml>=6.0
+  - plotly
 
   # CLI and utilities
   - click>=8.0
   - tabulate>=0.9
+  - colorlog
 
   # Bioinformatics tools (from bioconda)
-  - seqkit
-  - sabre
+  # NOTE: sabre not available for osx-arm64 via conda. On Apple Silicon use: brew install sabre
+  - bowtie2
+  - fastqc
+  - cutadapt
   - trim-galore
+  - seqkit
+  # - sabre  # Install via: brew install sabre (macOS) or conda install -c bioconda sabre (Linux)
+
+  # System utilities
+  - unzip
+  - curl
+  - wget
 
   # Development tools
-  - pip
+  - cython
 
-  # Install package and optional dependencies via pip
+  # Pip must be listed last before the pip section
+  - pip
   - pip:
       # Install this package in editable mode
       - -e .
+
+      # For plotly export
+      - kaleido
 
       # Development dependencies
       - pytest>=7.0
@@ -42,9 +57,7 @@ dependencies:
       - types-tabulate
 
       # Lab-specific packages (install from GitHub or local)
-      # Uncomment these if you have access to the lab packages:
-      # - git+https://github.com/jyesselm/rna_map.git
-      # - git+https://github.com/jyesselm/barcode_demultiplex.git
-      # - git+https://github.com/jyesselm/fastqsplitter.git
-      # - git+https://github.com/jyesselm/seq_tools.git
-      # - git+https://github.com/jyesselm/gsheets.git
+      - git+https://github.com/jyesselm/rna_map.git
+      - git+https://github.com/jyesselm/barcode_demultiplex.git
+      - git+https://github.com/jyesselm/seq_tools.git
+      - git+https://github.com/YesselmanLab/ylab_gdrive.git

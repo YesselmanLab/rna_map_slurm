@@ -11,7 +11,7 @@ from typing import Any, cast
 import click
 import pandas as pd
 from barcode_demultiplex.demultiplex import find_helix_barcodes
-from gsheets.sheet import get_sequence_run_info_sheet, get_sequence_sheet
+from ylab_gdrive.sheet import get_sequence_run_info_sheet, get_sequence_sheet
 
 from rna_map_slurm.cli.utils import (
     get_seq_path,
