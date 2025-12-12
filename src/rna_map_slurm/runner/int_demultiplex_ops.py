@@ -17,8 +17,8 @@ from rna_map_slurm.utils.logging import setup_logging
 from rna_map_slurm.utils.timing import time_it
 
 
-@time_it
 @click.command("int-demultiplex")
+@time_it
 @click.argument("construct_barcode")
 @click.argument("b1_seq")
 @click.argument("b2_seq")
@@ -58,8 +58,8 @@ def int_demultiplex(
     )
 
 
-@time_it
 @click.command("int-demultiplex-rna-map")
+@time_it
 @click.argument("code")
 @click.argument("lib_barcode_seq")
 @click.argument("construct_barcode_seq")
@@ -79,8 +79,8 @@ def int_demultiplex_rna_map(
     task_int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq)
 
 
-@time_it
 @click.command("int-demultiplex-rna-map-combine")
+@time_it
 @click.argument("barcode_seq")
 @click.argument("rna_name")
 def int_demultiplex_rna_map_combine(barcode_seq: str, rna_name: str) -> None:

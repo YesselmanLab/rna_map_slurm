@@ -17,8 +17,8 @@ from rna_map_slurm.utils.timing import time_it
 log = get_logger("runner.fastq")
 
 
-@time_it
 @click.command("split-fastqs")
+@time_it
 @click.argument("r1_path", type=click.Path(exists=True), required=True)
 @click.argument("r2_path", type=click.Path(exists=True), required=True)
 @click.argument("output_dir", type=click.Path(exists=True), required=True)
@@ -56,8 +56,8 @@ def split_fastqs(
     split_fastq_file(r2_path, output_dir, num_chunks, start, threads)
 
 
-@time_it
 @click.command()
+@time_it
 @click.argument("csv")
 @click.argument("r1_path", type=click.Path(exists=True))
 @click.argument("r2_path", type=click.Path(exists=True))
@@ -75,8 +75,8 @@ def demultiplex(csv: str, r1_path: str, r2_path: str, output_dir: str) -> None:
     task_demultiplex(csv, r1_path, r2_path, output_dir)
 
 
-@time_it
 @click.command("join-fastq-files")
+@time_it
 def join_fastq_files() -> None:
     """Join demultiplexed FASTQ files by barcode."""
     setup_logging()

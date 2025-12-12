@@ -14,8 +14,8 @@ from rna_map_slurm.utils.timing import time_it
 log = get_logger("runner.rna_map")
 
 
-@time_it
 @click.command("run-rna-map")
+@time_it
 @click.argument("fasta_path", type=click.Path(exists=True))
 @click.argument("r1_path", type=click.Path(exists=True))
 @click.argument("r2_path", type=click.Path(exists=True))
@@ -41,8 +41,8 @@ def run_rna_map(
     task_run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir)
 
 
-@time_it
 @click.command("rna-map-combine")
+@time_it
 @click.argument("barcode_seq")
 @click.argument("construct")
 def rna_map_combine(barcode_seq: str, construct: str) -> None:
