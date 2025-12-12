@@ -9,7 +9,7 @@ import subprocess
 from typing import Any
 
 import pandas as pd
-import rna_map
+import rna_map.run
 from fastqsplitter import split_fastqs as fastqsplitter
 from rna_map.mutation_histogram import (
     get_mut_histos_from_pickle_file,

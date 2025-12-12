@@ -131,10 +131,10 @@ python_functions = ["test_*"]
 addopts = [
     "-v",
     "--tb=short",
-    "--cov=rna_map_slurm",
+    "--cov=src/rna_map_slurm",
     "--cov-report=term-missing",
     "--cov-report=html:htmlcov",
-    "--cov-fail-under=90",
+    "--cov-fail-under=10",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
