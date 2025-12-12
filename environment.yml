@@ -43,9 +43,8 @@ dependencies:
   - pip:
       # Install this package in editable mode
       - -e .
-
-      # For plotly export
-      - kaleido
+      
+      - fastqsplitter
 
       # Development dependencies
       - pytest>=7.0
