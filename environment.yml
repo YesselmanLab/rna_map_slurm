@@ -43,7 +43,7 @@ dependencies:
   - pip:
       # Install this package in editable mode
       - -e .
-      
+
       - fastqsplitter
 
       # Development dependencies
@@ -57,7 +57,7 @@ dependencies:
       - types-tabulate
 
       # Lab-specific packages (install from GitHub or local)
-      - git+https://github.com/jyesselm/rna_map.git
+      - git+https://github.com/YesselmanLab/rna_map.git
       - git+https://github.com/jyesselm/barcode_demultiplex.git
       - git+https://github.com/jyesselm/seq_tools.git
       - git+https://github.com/YesselmanLab/ylab_gdrive.git

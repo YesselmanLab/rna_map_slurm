@@ -20,8 +20,8 @@ MAX_CONCURRENT_JOBS = 999
 POLL_INTERVAL_SECONDS = 60
 
 
-@time_it
 @click.command()
+@time_it
 def run() -> None:
     """Run the SLURM workflow, submitting and monitoring jobs."""
     _initialize_run()
