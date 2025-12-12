@@ -101,8 +101,16 @@ class SabreDemultiplexer:
         lines: list[str] = []
 
         for _, row in df.iterrows():
-            barcode = str(row["barcode"])
-            barcode_seq = str(row["barcode_seq"])
+            barcode = row["barcode"]
+            barcode_seq = row["barcode_seq"]
+
+            # Skip rows with missing barcode or barcode_seq
+            if pd.isna(barcode) or pd.isna(barcode_seq):
+                log.warning(f"Skipping row with missing barcode or barcode_seq: {row.to_dict()}")
+                continue
+
+            barcode = str(barcode)
+            barcode_seq = str(barcode_seq)
 
             if barcode in seen:
                 log.warning(f"{barcode} has been used more than once; this may be an issue.")
