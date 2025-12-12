@@ -118,7 +118,7 @@ def _format_sequencing_run_info(df: pd.DataFrame) -> pd.DataFrame:
     df = replace_spaces_warn(df, "construct")
     df = replace_spaces_warn(df, "exp_type")
 
-    df_seq = get_sequence_sheet()
+    df_seq = get_sequences_df()
     demult_cmds = _get_demultiplex_commands(df, df_seq)
     df = df.assign(demult_cmd=pd.Series(demult_cmds, dtype=object))
 
