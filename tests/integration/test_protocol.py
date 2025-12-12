@@ -80,8 +80,8 @@ class TestDemultiplexWithRealData:
     @pytest.fixture
     def demultiplex_csv(self, temp_dir: Path) -> Path:
         """Create a sample CSV for demultiplexing."""
-        csv_content = """barcode,barcode_seq
-BC01,ACGTACGT
+        csv_content = """barcode,barcode_seq,construct
+BC01,ACGTACGT,test_construct
 """
         csv_path = temp_dir / "barcodes.csv"
         csv_path.write_text(csv_content)
