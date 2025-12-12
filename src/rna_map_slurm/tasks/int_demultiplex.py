@@ -15,10 +15,11 @@ from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
     write_mut_histos_to_pickle_file,
 )
-from rna_map.parameters import get_preset_params
+from rna_map.parameters import parse_parameters_from_file
 from seq_tools.dataframe import to_dna, to_fasta
 from seq_tools.sequence import get_reverse_complement
 
+from rna_map_slurm.config.paths import get_rna_map_defaults_path
 from rna_map_slurm.plotting.pop_avg import generate_pop_avg_plots
 from rna_map_slurm.tasks.rna_map_helpers import get_mut_histo_dataframe
 from rna_map_slurm.utils.files import get_file_size, random_string
@@ -175,6 +176,7 @@ def int_demultiplex_rna_map(
     lib_barcode_seq: str,
     construct_barcode_seq: str,
     params: dict[str, Any] | None = None,
+    params_file: str | None = None,
 ) -> None:
     """Run RNA mapping on internally demultiplexed reads.
 
@@ -183,6 +185,7 @@ def int_demultiplex_rna_map(
         lib_barcode_seq: Library barcode sequence.
         construct_barcode_seq: Construct barcode sequence.
         params: Optional workflow parameters.
+        params_file: Optional path to rna-map parameters file.
     """
     fastq_paths = _find_demultiplexed_fastqs(lib_barcode_seq, construct_barcode_seq)
     if fastq_paths is None:
@@ -193,7 +196,7 @@ def int_demultiplex_rna_map(
         return
 
     _run_int_demultiplex_rna_map(
-        code, lib_barcode_seq, construct_barcode_seq, mate_1_path, mate_2_path, params
+        code, lib_barcode_seq, construct_barcode_seq, mate_1_path, mate_2_path, params, params_file
     )
 
 
@@ -253,6 +256,7 @@ def _run_int_demultiplex_rna_map(
     mate_1_path: str,
     mate_2_path: str,
     params: dict[str, Any] | None = None,
+    params_file: str | None = None,
 ) -> None:
     """Execute RNA mapping for internally demultiplexed reads.
 
@@ -263,6 +267,7 @@ def _run_int_demultiplex_rna_map(
         mate_1_path: Path to mate 1 FASTQ.
         mate_2_path: Path to mate 2 FASTQ.
         params: Optional workflow parameters.
+        params_file: Optional path to rna-map parameters file.
     """
     df_barcode = _prepare_barcode_dataframe(code, lib_barcode_seq, construct_barcode_seq)
     if df_barcode is None:
@@ -278,7 +283,7 @@ def _run_int_demultiplex_rna_map(
         df_barcode[["name", "sequence", "structure"]].to_csv(f"{tmp_dir}/test.csv", index=False)
 
         os.chdir(tmp_dir)
-        rna_map_params = get_preset_params("barcoded-library")
+        rna_map_params = _load_rna_map_params(params_file)
         rna_map.run.run("test.fasta", mate_1_path, mate_2_path, "test.csv", rna_map_params)
 
         output_path = f"{cur_dir}/int-demultiplexed-rna-map/{lib_barcode_seq}"
@@ -291,6 +296,24 @@ def _run_int_demultiplex_rna_map(
     finally:
         os.chdir(cur_dir)
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _load_rna_map_params(params_file: str | None = None) -> dict[str, Any]:
+    """Load rna-map parameters from file or defaults.
+
+    Args:
+        params_file: Optional path to rna-map parameters file.
+
+    Returns:
+        Dictionary of rna-map parameters.
+    """
+    if params_file is not None:
+        log.info(f"Using provided params file: {params_file}")
+        return parse_parameters_from_file(params_file)
+
+    default_params_file = get_rna_map_defaults_path()
+    log.info(f"Using bundled rna-map defaults: {default_params_file}")
+    return parse_parameters_from_file(default_params_file)
 
 
 def _prepare_barcode_dataframe(

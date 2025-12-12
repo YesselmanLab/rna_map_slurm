@@ -63,10 +63,17 @@ def int_demultiplex(
 @click.argument("code")
 @click.argument("lib_barcode_seq")
 @click.argument("construct_barcode_seq")
+@click.option(
+    "--params-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to rna-map parameters YAML file. Uses bundled defaults if not specified.",
+)
 def int_demultiplex_rna_map(
     code: str,
     lib_barcode_seq: str,
     construct_barcode_seq: str,
+    params_file: str | None,
 ) -> None:
     """Run RNA mapping on internally demultiplexed reads.
 
@@ -74,9 +81,10 @@ def int_demultiplex_rna_map(
         code: Construct code.
         lib_barcode_seq: Library barcode sequence.
         construct_barcode_seq: Internal construct barcode sequence.
+        params_file: Optional path to rna-map parameters file.
     """
     setup_logging()
-    task_int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq)
+    task_int_demultiplex_rna_map(code, lib_barcode_seq, construct_barcode_seq, params_file=params_file)
 
 
 @click.command("int-demultiplex-rna-map-combine")

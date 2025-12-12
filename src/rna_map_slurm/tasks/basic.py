@@ -16,8 +16,9 @@ from rna_map.mutation_histogram import (
     merge_mut_histo_dicts,
     write_mut_histos_to_pickle_file,
 )
-from rna_map.parameters import get_preset_params, parse_parameters_from_file
+from rna_map.parameters import parse_parameters_from_file
 
+from rna_map_slurm.config.paths import get_rna_map_defaults_path
 from rna_map_slurm.io.demultiplex import SabreDemultiplexer
 from rna_map_slurm.models.fastq import FastqFile, PairedFastqFiles
 from rna_map_slurm.plotting.pop_avg import generate_pop_avg_plots
@@ -154,6 +155,7 @@ def run_rna_map(
     r2_path: str,
     csv_path: str,
     output_dir: str,
+    params_file: str | None = None,
 ) -> None:
     """Run RNA mapping on FASTQ files.
 
@@ -163,13 +165,16 @@ def run_rna_map(
         r2_path: Path to R2 FASTQ file.
         csv_path: Path to CSV with sequence info.
         output_dir: Output directory.
+        params_file: Optional path to rna-map parameters file.
     """
     cur_dir = os.getcwd()
     log.info(f"Changing directory to {output_dir}")
     os.chdir(output_dir)
 
     try:
-        fa_path, csv_path, params = _prepare_rna_map_inputs(fa_path, csv_path)
+        fa_path, csv_path, params = _prepare_rna_map_inputs(
+            fa_path, csv_path, params_file
+        )
         _execute_rna_map(fa_path, r1_path, r2_path, csv_path, params)
         _cleanup_rna_map_outputs()
     finally:
@@ -179,12 +184,14 @@ def run_rna_map(
 def _prepare_rna_map_inputs(
     fa_path: str,
     csv_path: str,
+    params_file: str | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     """Prepare inputs for RNA mapping, using local overrides if present.
 
     Args:
         fa_path: Default FASTA path.
         csv_path: Default CSV path.
+        params_file: Optional path to rna-map parameters file.
 
     Returns:
         Tuple of (fasta_path, csv_path, params).
@@ -197,11 +204,17 @@ def _prepare_rna_map_inputs(
         log.info("Using existing input.csv file")
         csv_path = "input.csv"
 
+    # Priority: local params.yml > provided params_file > bundled defaults
     if os.path.isfile("params.yml"):
         log.info("Using existing params.yml file")
         params = parse_parameters_from_file("params.yml")
+    elif params_file is not None:
+        log.info(f"Using provided params file: {params_file}")
+        params = parse_parameters_from_file(params_file)
     else:
-        params = get_preset_params("barcoded-library")
+        default_params_file = get_rna_map_defaults_path()
+        log.info(f"Using bundled rna-map defaults: {default_params_file}")
+        params = parse_parameters_from_file(default_params_file)
 
     params["overwrite"] = True
     params["bit_vector"]["summary_output_only"] = True

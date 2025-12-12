@@ -54,7 +54,18 @@ def get_data_csv(run_name: str) -> None:
 @click.argument("data_csv")
 @click.argument("data_dirs", nargs=-1)
 @click.option("--param-file", type=click.Path(exists=True), default=None)
-def setup(data_csv: str, data_dirs: tuple[str, ...], param_file: str | None) -> None:
+@click.option(
+    "--rna-map-params",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to rna-map parameters YAML file. Copied to inputs/ for use by jobs.",
+)
+def setup(
+    data_csv: str,
+    data_dirs: tuple[str, ...],
+    param_file: str | None,
+    rna_map_params: str | None,
+) -> None:
     """Set up workflow directories and generate job files."""
     os.makedirs("logs", exist_ok=True)
     _remove_old_log("logs/setup.log")
@@ -72,10 +83,12 @@ def setup(data_csv: str, data_dirs: tuple[str, ...], param_file: str | None) -> 
 
     _setup_directories(sub_df)
     _setup_input_files(sub_df, seq_path)
+    _setup_rna_map_params(rna_map_params)
 
     all_pfqs = _collect_paired_fastqs(data_dirs)
     fastq_chunks = cast(int, params["fastq_chunks"])
     params["num_dirs"] = fastq_chunks * len(all_pfqs)
+    params["rna_map_params_file"] = _get_rna_map_params_path(rna_map_params)
 
     _generate_all_jobs(df, params, all_pfqs)
 
@@ -185,6 +198,24 @@ def _setup_directories(df: pd.DataFrame) -> None:
     os.makedirs("inputs/barcode_jsons", exist_ok=True)
     os.makedirs("inputs/fastas", exist_ok=True)
     os.makedirs("inputs/rnas", exist_ok=True)
+
+
+def _setup_rna_map_params(rna_map_params: str | None) -> None:
+    """Copy rna-map parameters file to inputs directory if provided."""
+    if rna_map_params is None:
+        log.info("No custom rna-map params file provided, will use bundled defaults")
+        return
+
+    dest_path = "inputs/rna-map-params.yml"
+    log.info(f"Copying rna-map params file to {dest_path}")
+    shutil.copy(rna_map_params, dest_path)
+
+
+def _get_rna_map_params_path(rna_map_params: str | None) -> str | None:
+    """Get the path to the rna-map params file for job generation."""
+    if rna_map_params is None:
+        return None
+    return os.path.abspath("inputs/rna-map-params.yml")
 
 
 def _create_run_directories(run_name: str) -> None:

@@ -47,7 +47,7 @@ def _parse_data_dirs_from_log() -> list[str] | None:
 
     with open(log_file_path, encoding="utf-8") as log_file:
         for line in log_file:
-            match = re.match(r"^rna-map-slurm\.cli - INFO - data_dirs: \((.*)\)", line)
+            match = re.match(r"^rna-map-slurm\.cli\.setup - INFO - data_dirs: \((.*)\)", line)
             if match:
                 data_dirs = match.group(1).split(",")[:1]
                 return [x.strip().strip("'\"") for x in data_dirs]

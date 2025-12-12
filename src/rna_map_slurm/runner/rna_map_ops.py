@@ -21,12 +21,19 @@ log = get_logger("runner.rna_map")
 @click.argument("r2_path", type=click.Path(exists=True))
 @click.argument("csv_path", type=click.Path(exists=True))
 @click.argument("output_dir", type=click.Path(exists=True))
+@click.option(
+    "--params-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to rna-map parameters YAML file. Uses bundled defaults if not specified.",
+)
 def run_rna_map(
     fasta_path: str,
     r1_path: str,
     r2_path: str,
     csv_path: str,
     output_dir: str,
+    params_file: str | None,
 ) -> None:
     """Run RNA mapping on FASTQ files.
 
@@ -36,9 +43,10 @@ def run_rna_map(
         r2_path: Path to R2 FASTQ file.
         csv_path: Path to sequence CSV.
         output_dir: Output directory.
+        params_file: Optional path to rna-map parameters file.
     """
     setup_logging()
-    task_run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir)
+    task_run_rna_map(fasta_path, r1_path, r2_path, csv_path, output_dir, params_file)
 
 
 @click.command("rna-map-combine")

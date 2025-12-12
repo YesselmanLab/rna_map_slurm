@@ -155,6 +155,7 @@ def generate_int_demultiplex_rna_map_jobs(
     runs_per_job = params["tasks_per_job"][job_name]
     slurm_params = params["slurm_options"][job_name]
     extra_cmds = params["slurm_options"].get("extra-header-cmds", "")
+    rna_map_params_file = params.get("rna_map_params_file")
 
     runs = _collect_int_demultiplex_runs(df)
     run_groups = group_into_batches(runs, runs_per_job)
@@ -163,7 +164,7 @@ def generate_int_demultiplex_rna_map_jobs(
     for i, group in enumerate(run_groups):
         name = f"{job_name}-{i:04}"
         header = create_job_header(name, slurm_params, extra_cmds, str(job_dir))
-        body = _build_int_rna_map_job_body(group)
+        body = _build_int_rna_map_job_body(group, rna_map_params_file)
         write_job_file(job_dir, name, header + body)
         job_names.append(name)
 
@@ -196,18 +197,26 @@ def _collect_int_demultiplex_runs(df: pd.DataFrame) -> list[tuple[str, str, str]
     return runs
 
 
-def _build_int_rna_map_job_body(runs: list[tuple[str, str, str]]) -> str:
+def _build_int_rna_map_job_body(
+    runs: list[tuple[str, str, str]],
+    params_file: str | None = None,
+) -> str:
     """Build internal RNA-map job body.
 
     Args:
         runs: List of (code, barcode_seq, full_barcode) tuples.
+        params_file: Optional path to rna-map parameters file.
 
     Returns:
         Job body as string.
     """
+    params_opt = ""
+    if params_file is not None:
+        params_opt = f" --params-file {params_file}"
+
     lines: list[str] = []
     for code, barcode_seq, full_barcode in runs:
-        lines.append(f"rna-map-slurm-runner int-demultiplex-rna-map {code} {barcode_seq} {full_barcode}")
+        lines.append(f"rna-map-slurm-runner int-demultiplex-rna-map {code} {barcode_seq} {full_barcode}{params_opt}")
         lines.append("")
     return "\n".join(lines)
 

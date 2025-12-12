@@ -24,3 +24,12 @@ def get_resources_path() -> str:
         Path to the resources directory.
     """
     return os.path.join(get_lib_path(), "rna_map_slurm", "resources")
+
+
+def get_rna_map_defaults_path() -> str:
+    """Get the path to the default rna-map parameters file.
+
+    Returns:
+        Path to rna-map-defaults.yml.
+    """
+    return os.path.join(get_resources_path(), "rna-map-defaults.yml")

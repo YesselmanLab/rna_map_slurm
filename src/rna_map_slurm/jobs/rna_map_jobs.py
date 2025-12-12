@@ -72,6 +72,7 @@ def generate_rna_map_jobs(
     runs_per_job = params["tasks_per_job"][job_name]
     slurm_params = params["slurm_options"][job_name]
     extra_cmds = params["slurm_options"].get("extra-header-cmds", "")
+    rna_map_params_file = params.get("rna_map_params_file")
 
     threshold = params.get("construct_options", {}).get(
         "large_construct_threshold",
@@ -106,6 +107,7 @@ def generate_rna_map_jobs(
             extra_cmds=extra_cmds,
             job_index=job_index,
             is_large=construct_is_large,
+            params_file=rna_map_params_file,
         )
         job_names.extend(new_names)
 
@@ -123,6 +125,7 @@ def _generate_jobs_for_construct(
     extra_cmds: str,
     job_index: int,
     is_large: bool,
+    params_file: str | None = None,
 ) -> tuple[int, list[str]]:
     """Generate jobs for a single construct.
 
@@ -135,6 +138,7 @@ def _generate_jobs_for_construct(
         extra_cmds: Extra SBATCH commands.
         job_index: Current job index.
         is_large: Whether this is a large construct.
+        params_file: Optional path to rna-map parameters file.
 
     Returns:
         Tuple of (new job index, list of job names created).
@@ -147,7 +151,7 @@ def _generate_jobs_for_construct(
             for single_dir in dir_group:
                 name = f"{job_name}-{job_index:04}"
                 header = create_job_header(name, slurm_params, extra_cmds, job_dir)
-                body = _build_rna_map_job_body(row, [single_dir])
+                body = _build_rna_map_job_body(row, [single_dir], params_file)
                 write_job_file(job_dir, name, header + body)
                 job_names.append(name)
                 job_index += 1
@@ -155,7 +159,7 @@ def _generate_jobs_for_construct(
             # Normal batching
             name = f"{job_name}-{job_index:04}"
             header = create_job_header(name, slurm_params, extra_cmds, job_dir)
-            body = _build_rna_map_job_body(row, dir_group)
+            body = _build_rna_map_job_body(row, dir_group, params_file)
             write_job_file(job_dir, name, header + body)
             job_names.append(name)
             job_index += 1
@@ -166,12 +170,14 @@ def _generate_jobs_for_construct(
 def _build_rna_map_job_body(
     row: pd.Series[Any],
     dirs: list[str],
+    params_file: str | None = None,
 ) -> str:
     """Build RNA-map job body.
 
     Args:
         row: DataFrame row with construct info.
         dirs: Data directories to process.
+        params_file: Optional path to rna-map parameters file.
 
     Returns:
         Job body as string.
@@ -183,6 +189,10 @@ def _build_rna_map_job_body(
     fa_path = os.path.abspath(f"inputs/fastas/{code}.fasta")
     csv_path = os.path.abspath(f"inputs/rnas/{code}.csv")
 
+    params_opt = ""
+    if params_file is not None:
+        params_opt = f" --params-file {params_file}"
+
     lines: list[str] = []
     for data_dir in dirs:
         output_dir = os.path.abspath(f"{data_dir}/{barcode_seq}/{construct}")
@@ -190,7 +200,7 @@ def _build_rna_map_job_body(
         fq1_path = os.path.abspath(f"{data_dir}/{barcode_seq}/test_R1.fastq.gz")
         fq2_path = os.path.abspath(f"{data_dir}/{barcode_seq}/test_R2.fastq.gz")
         lines.append(
-            f"rna-map-slurm-runner run-rna-map {fa_path} {fq2_path} {fq1_path} {csv_path} {output_dir}"
+            f"rna-map-slurm-runner run-rna-map {fa_path} {fq2_path} {fq1_path} {csv_path} {output_dir}{params_opt}"
         )
         lines.append("")
 
