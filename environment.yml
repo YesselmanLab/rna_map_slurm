@@ -27,6 +27,7 @@ dependencies:
   - cutadapt
   - trim-galore
   - seqkit
+  - sabre
   # - sabre  # Install via: brew install sabre (macOS) or conda install -c bioconda sabre (Linux)
 
   # System utilities

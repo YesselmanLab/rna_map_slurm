@@ -11,7 +11,7 @@ from typing import Any, cast
 import click
 import pandas as pd
 from barcode_demultiplex.demultiplex import find_helix_barcodes
-from ylab_gdrive.sheet import get_sequence_run_info_sheet, get_sequence_sheet
+from ylab_gdrive import get_sequence_run_info_df, get_sequences_df
 
 from rna_map_slurm.cli.utils import (
     get_seq_path,
@@ -44,7 +44,7 @@ def get_data_csv(run_name: str) -> None:
     _remove_old_log("logs/get_data_csv.log")
     setup_logging(file_name="get_data_csv.log")
 
-    df = get_sequence_run_info_sheet()
+    df = get_sequence_run_info_df()
     df = df[df["run_name"] == run_name]
     df = _format_sequencing_run_info(df)
     df.to_csv("data.csv", index=False)

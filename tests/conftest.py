@@ -35,6 +35,48 @@ def sample_fastq_gzipped_dir(test_resources_dir: Path) -> Path:
 
 
 @pytest.fixture
+def c0098_test_case_dir(test_resources_dir: Path) -> Path:
+    """Get path to C0098 test case directory with real FASTQ files."""
+    return test_resources_dir / "test_cases" / "C0098"
+
+
+@pytest.fixture
+def c0098_fastq_r1(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 R1 FASTQ file."""
+    return c0098_test_case_dir / "R1.sub.fastq.gz"
+
+
+@pytest.fixture
+def c0098_fastq_r2(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 R2 FASTQ file."""
+    return c0098_test_case_dir / "R2.sub.fastq.gz"
+
+
+@pytest.fixture
+def c0098_fasta(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 FASTA file."""
+    return c0098_test_case_dir / "C0098.fasta"
+
+
+@pytest.fixture
+def c0098_csv(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 CSV file."""
+    return c0098_test_case_dir / "C0098.csv"
+
+
+@pytest.fixture
+def c0098_barcodes_json(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 barcodes JSON file."""
+    return c0098_test_case_dir / "C0098_barcodes.json"
+
+
+@pytest.fixture
+def c0098_data_csv(c0098_test_case_dir: Path) -> Path:
+    """Get path to C0098 data CSV file for workflow setup."""
+    return c0098_test_case_dir / "data.csv"
+
+
+@pytest.fixture
 def sample_data_csv(test_resources_dir: Path, temp_dir: Path) -> Path:
     """Create a sample data.csv file for testing."""
     csv_content = """barcode,barcode_seq,construct,code,run_name,exp_name,exp_type,data_type
