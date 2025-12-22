@@ -45,7 +45,7 @@ def get_data_csv(run_name: str) -> None:
     setup_logging(file_name="get_data_csv.log")
 
     df = get_sequence_run_info_df()
-    df = df[df["run_name"] == run_name]
+    df = df[df["run_name"] == run_name].reset_index(drop=True)
     df = _format_sequencing_run_info(df)
     df.to_csv("data.csv", index=False)
 
@@ -133,7 +133,7 @@ def _format_sequencing_run_info(df: pd.DataFrame) -> pd.DataFrame:
 
     df_seq = get_sequences_df()
     demult_cmds = _get_demultiplex_commands(df, df_seq)
-    df = df.assign(demult_cmd=pd.Series(demult_cmds, dtype=object))
+    df["demult_cmd"] = demult_cmds
 
     return df
 
