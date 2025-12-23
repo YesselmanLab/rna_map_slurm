@@ -47,6 +47,9 @@ def int_demultiplex(
         b2_max_pos: Maximum position for barcode 2.
     """
     setup_logging()
+    # Convert U to T for DNA sequences (FASTQ uses DNA, not RNA)
+    b1_seq = b1_seq.replace("U", "T")
+    b2_seq = b2_seq.replace("U", "T")
     task_int_demultiplex(
         construct_barcode,
         b1_seq,
