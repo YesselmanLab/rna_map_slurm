@@ -126,8 +126,9 @@ def _build_demultiplex_command(record: dict[str, Any]) -> str:
     min_len = end_len - bb2[1]
     bb2_mapped = [min_len, max_len]
 
-    b1_seq = record["barcodes"][0][0]
-    b2_seq = record["barcodes"][0][1]
+    # Convert U to T for DNA sequences (FASTQ uses DNA, not RNA)
+    b1_seq = record["barcodes"][0][0].replace("U", "T")
+    b2_seq = record["barcodes"][0][1].replace("U", "T")
 
     return (
         f"rna-map-slurm-runner int-demultiplex {record['construct_barcode']} "
@@ -216,7 +217,9 @@ def _build_int_rna_map_job_body(
 
     lines: list[str] = []
     for code, barcode_seq, full_barcode in runs:
-        lines.append(f"rna-map-slurm-runner int-demultiplex-rna-map {code} {barcode_seq} {full_barcode}{params_opt}")
+        # Convert U to T to match file names from int-demultiplex
+        full_barcode_dna = full_barcode.replace("U", "T")
+        lines.append(f"rna-map-slurm-runner int-demultiplex-rna-map {code} {barcode_seq} {full_barcode_dna}{params_opt}")
         lines.append("")
     return "\n".join(lines)
 
