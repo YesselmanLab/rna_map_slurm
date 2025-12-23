@@ -104,10 +104,13 @@ def _run_seqkit_filtering(
     """
     r2_path = f"demultiplexed/{construct_barcode}/test_R2.fastq.gz"
     r1_path = f"demultiplexed/{construct_barcode}/test_R1.fastq.gz"
-    b2_seq_rc = get_reverse_complement(b2_seq)
+    # Convert U to T for barcode search (FASTQ uses DNA, not RNA)
+    b1_seq_dna = b1_seq.replace("U", "T")
+    b2_seq_dna = b2_seq.replace("U", "T")
+    b2_seq_rc = get_reverse_complement(b2_seq_dna)
 
     _run_command(
-        f'seqkit grep -s -p "{b1_seq}" -P -R {b1_min_pos - 2}:{b1_max_pos + 2} '
+        f'seqkit grep -s -p "{b1_seq_dna}" -P -R {b1_min_pos - 2}:{b1_max_pos + 2} '
         f'{r2_path} -o {tmp_dir}/test_R2.fastq.gz'
     )
     _run_command(

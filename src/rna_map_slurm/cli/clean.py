@@ -35,7 +35,18 @@ def clean(stage: str) -> None:
 def _clean_all() -> None:
     """Remove all workflow directories."""
     log.info("Cleaning all directories")
-    for dir_name in ["jobs", "submits", "data", "inputs", "logs"]:
+    dirs_to_clean = [
+        "jobs",
+        "submits",
+        "data",
+        "inputs",
+        "logs",
+        "demultiplexed",
+        "int-demultiplexed",
+        "int-demultiplexed-rna-map",
+        "results",
+    ]
+    for dir_name in dirs_to_clean:
         shutil.rmtree(dir_name, ignore_errors=True)
 
 
