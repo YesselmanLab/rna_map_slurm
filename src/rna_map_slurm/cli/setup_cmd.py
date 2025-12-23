@@ -260,7 +260,29 @@ def _generate_barcode_json(row: pd.Series[Any], seq_path: str) -> None:
 
     df_seq = pd.read_csv(f"{seq_path}/rna/{row['code']}.csv")
     df_barcodes = find_helix_barcodes(df_seq, helices)
+    # Convert U to T in all sequence fields (FASTQ uses DNA, not RNA)
+    df_barcodes = _convert_u_to_t_in_barcodes(df_barcodes)
     df_barcodes.to_json(f"inputs/barcode_jsons/{row['code']}.json", orient="records")
+
+
+def _convert_u_to_t_in_barcodes(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert U to T in all sequence-containing columns of barcode DataFrame."""
+    df = df.copy()
+    # Convert sequence column
+    if "sequence" in df.columns:
+        df["sequence"] = df["sequence"].str.replace("U", "T")
+    # Convert full_barcode column
+    if "full_barcode" in df.columns:
+        df["full_barcode"] = df["full_barcode"].str.replace("U", "T")
+    # Convert name column (may contain barcode sequences)
+    if "name" in df.columns:
+        df["name"] = df["name"].str.replace("U", "T")
+    # Convert barcodes column (nested list of sequences)
+    if "barcodes" in df.columns:
+        df["barcodes"] = df["barcodes"].apply(
+            lambda x: [[seq.replace("U", "T") for seq in pair] for pair in x]
+        )
+    return df
 
 
 def _parse_helix_arguments(demult_cmd: str) -> list[list[int]]:
