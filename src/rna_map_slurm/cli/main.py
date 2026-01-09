@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import click
 
+from rna_map_slurm.cli.check_cmd import check_jobs
 from rna_map_slurm.cli.clean import clean
+from rna_map_slurm.cli.config_cmd import generate_example_config
 from rna_map_slurm.cli.deposit import deposit_results
 from rna_map_slurm.cli.run import run
 from rna_map_slurm.cli.setup_cmd import get_data_csv, setup
@@ -21,10 +23,12 @@ def cli() -> None:
 cli.add_command(setup)
 cli.add_command(get_data_csv)
 cli.add_command(run)
+cli.add_command(check_jobs)
 cli.add_command(generate_summaries)
 cli.add_command(deposit_results)
 cli.add_command(clean)
 cli.add_command(zip_demultiplex_subset)
+cli.add_command(generate_example_config)
 
 
 if __name__ == "__main__":
