@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.scalarstring import DoubleQuotedScalarString as DQS
 
 
 def _build_commented_config() -> CommentedMap:
@@ -136,7 +137,7 @@ def _build_commented_config() -> CommentedMap:
 
     # default slurm options
     default_opts = CommentedMap()
-    default_opts["time"] = "6:00:00"
+    default_opts["time"] = DQS("6:00:00")
     default_opts["cpus-per-task"] = 1
     default_opts["mem-per-cpu"] = "2GB"
     default_opts.yaml_set_comment_before_after_key(
@@ -155,7 +156,7 @@ def _build_commented_config() -> CommentedMap:
 
     # split-fastq options
     split_fastq_opts = CommentedMap()
-    split_fastq_opts["time"] = "04:00:00"
+    split_fastq_opts["time"] = DQS("04:00:00")
     split_fastq_opts["cpus-per-task"] = 8
     split_fastq_opts["mem-per-cpu"] = "64GB"
     slurm_options["split-fastq"] = split_fastq_opts
@@ -165,7 +166,7 @@ def _build_commented_config() -> CommentedMap:
 
     # trim-galore options
     trim_galore_opts = CommentedMap()
-    trim_galore_opts["time"] = "04:00:00"
+    trim_galore_opts["time"] = DQS("04:00:00")
     trim_galore_opts["cpus-per-task"] = 1
     trim_galore_opts["mem-per-cpu"] = "2GB"
     slurm_options["trim-galore"] = trim_galore_opts
@@ -175,7 +176,7 @@ def _build_commented_config() -> CommentedMap:
 
     # demultiplex options
     demultiplex_opts = CommentedMap()
-    demultiplex_opts["time"] = "04:00:00"
+    demultiplex_opts["time"] = DQS("04:00:00")
     demultiplex_opts["cpus-per-task"] = 1
     demultiplex_opts["mem-per-cpu"] = "2GB"
     slurm_options["demultiplex"] = demultiplex_opts
@@ -185,7 +186,7 @@ def _build_commented_config() -> CommentedMap:
 
     # int-demultiplex options
     int_demultiplex_opts = CommentedMap()
-    int_demultiplex_opts["time"] = "12:00:00"
+    int_demultiplex_opts["time"] = DQS("12:00:00")
     int_demultiplex_opts["cpus-per-task"] = 1
     int_demultiplex_opts["mem-per-cpu"] = "2GB"
     slurm_options["int-demultiplex"] = int_demultiplex_opts
@@ -195,7 +196,7 @@ def _build_commented_config() -> CommentedMap:
 
     # join-fastq-files options
     join_fastq_opts = CommentedMap()
-    join_fastq_opts["time"] = "12:00:00"
+    join_fastq_opts["time"] = DQS("12:00:00")
     join_fastq_opts["cpus-per-task"] = 1
     join_fastq_opts["mem-per-cpu"] = "4GB"
     slurm_options["join-fastq-files"] = join_fastq_opts
@@ -205,7 +206,7 @@ def _build_commented_config() -> CommentedMap:
 
     # rna-map options
     rna_map_opts = CommentedMap()
-    rna_map_opts["time"] = "6:00:00"
+    rna_map_opts["time"] = DQS("6:00:00")
     rna_map_opts["cpus-per-task"] = 1
     rna_map_opts["mem-per-cpu"] = "2GB"
     slurm_options["rna-map"] = rna_map_opts
@@ -215,7 +216,7 @@ def _build_commented_config() -> CommentedMap:
 
     # rna-map-combine options
     rna_map_combine_opts = CommentedMap()
-    rna_map_combine_opts["time"] = "6:00:00"
+    rna_map_combine_opts["time"] = DQS("6:00:00")
     rna_map_combine_opts["cpus-per-task"] = 1
     rna_map_combine_opts["mem-per-cpu"] = "2GB"
     slurm_options["rna-map-combine"] = rna_map_combine_opts
@@ -225,7 +226,7 @@ def _build_commented_config() -> CommentedMap:
 
     # int-demultiplex-rna-map options
     int_dm_rna_map_opts = CommentedMap()
-    int_dm_rna_map_opts["time"] = "2:00:00"
+    int_dm_rna_map_opts["time"] = DQS("2:00:00")
     int_dm_rna_map_opts["cpus-per-task"] = 1
     int_dm_rna_map_opts["mem-per-cpu"] = "2GB"
     slurm_options["int-demultiplex-rna-map"] = int_dm_rna_map_opts
@@ -235,7 +236,7 @@ def _build_commented_config() -> CommentedMap:
 
     # int-demultiplex-rna-map-combine options
     int_dm_rna_map_combine_opts = CommentedMap()
-    int_dm_rna_map_combine_opts["time"] = "2:00:00"
+    int_dm_rna_map_combine_opts["time"] = DQS("2:00:00")
     int_dm_rna_map_combine_opts["cpus-per-task"] = 1
     int_dm_rna_map_combine_opts["mem-per-cpu"] = "2GB"
     slurm_options["int-demultiplex-rna-map-combine"] = int_dm_rna_map_combine_opts
