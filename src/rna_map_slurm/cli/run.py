@@ -100,8 +100,12 @@ def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
     if result.job_ids:
         _save_submitted_jobs(result, jobs_csv_path.parent)
 
+    # Track if any errors occurred
+    has_errors = False
+
     if result.failed > 0:
-        log.warning(f"{result.failed} jobs failed to submit")
+        log.error(f"{result.failed} jobs failed to submit")
+        has_errors = True
 
     # Verify job outputs if requested
     if verify:
@@ -109,8 +113,12 @@ def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
         report = _verify_jobs(Path(job_dir), jobs_csv_path)
         _log_verification_result(report)
 
-        if report.failure_count > 0:
-            raise SystemExit(1)
+        if report.failure_count > 0 or report.missing_count > 0:
+            has_errors = True
+
+    if has_errors:
+        log.error("Completed with errors")
+        raise SystemExit(1)
 
     log.info("Done")
 
