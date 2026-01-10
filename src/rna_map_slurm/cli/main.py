@@ -11,6 +11,7 @@ from rna_map_slurm.cli.deposit import deposit_results
 from rna_map_slurm.cli.run import run
 from rna_map_slurm.cli.setup_cmd import get_data_csv, setup
 from rna_map_slurm.cli.summaries import generate_summaries
+from rna_map_slurm.cli.summary_cmd import summary
 from rna_map_slurm.cli.zip_cmd import zip_demultiplex_subset
 
 
@@ -24,6 +25,7 @@ cli.add_command(setup)
 cli.add_command(get_data_csv)
 cli.add_command(run)
 cli.add_command(check_jobs)
+cli.add_command(summary)
 cli.add_command(generate_summaries)
 cli.add_command(deposit_results)
 cli.add_command(clean)

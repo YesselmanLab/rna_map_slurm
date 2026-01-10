@@ -30,6 +30,8 @@ dependencies = [
     "pyyaml>=6.0",
     "tabulate>=0.9",
     "ruamel.yaml>=0.18",
+    "submitit>=1.5",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]

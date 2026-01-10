@@ -3,30 +3,20 @@
 from __future__ import annotations
 
 import os
-import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
 import pandas as pd
 
 from rna_map_slurm.jobs.checker import CheckReport, JobChecker
+from rna_map_slurm.jobs.executor import JobExecutor, SubmitResult
+from rna_map_slurm.jobs.pre_validator import PreRunValidator
 from rna_map_slurm.jobs.slurm import submit_job
+from rna_map_slurm.models.config import SlurmOptions
 from rna_map_slurm.utils.logging import get_logger, setup_logging
 from rna_map_slurm.utils.timing import time_it
 
 log = get_logger("cli.run")
-
-
-@dataclass
-class SubmitResult:
-    """Result of batch job submission."""
-
-    submitted: int = 0
-    failed: int = 0
-    job_ids: list[str] = field(default_factory=list)
-    failed_jobs: list[str] = field(default_factory=list)
-    elapsed_seconds: float = 0.0
 
 
 @click.command()
@@ -41,6 +31,22 @@ class SubmitResult:
     help="Check job outputs for errors after submission.",
 )
 @click.option(
+    "--validate/--no-validate",
+    default=True,
+    help="Run pre-submission validation checks.",
+)
+@click.option(
+    "--use-arrays/--no-arrays",
+    default=False,
+    help="Submit jobs as SLURM arrays for faster submission.",
+)
+@click.option(
+    "--max-concurrent",
+    default=50,
+    type=int,
+    help="Maximum concurrent array tasks (only with --use-arrays).",
+)
+@click.option(
     "--job-dir",
     default="jobs",
     type=click.Path(exists=False),
@@ -53,23 +59,51 @@ class SubmitResult:
     help="Path to jobs.csv file listing jobs to submit.",
 )
 @time_it
-def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
+def run(
+    dry_run: bool,
+    verify: bool,
+    validate: bool,
+    use_arrays: bool,
+    max_concurrent: int,
+    job_dir: str,
+    jobs_csv: str,
+) -> None:
     """Submit SLURM jobs and optionally verify completion.
 
     Submits all jobs defined in jobs.csv to the SLURM scheduler.
-    Unlike a polling approach, this submits all jobs immediately
-    and returns.
+    Supports both individual job submission and SLURM job arrays.
 
     \b
     Examples:
         rna-map-slurm run                    # Submit all jobs
         rna-map-slurm run --dry-run          # Show what would be submitted
+        rna-map-slurm run --use-arrays       # Submit as job arrays (faster)
         rna-map-slurm run --verify           # Submit and check outputs
+        rna-map-slurm run --no-validate      # Skip pre-run validation
     """
     _initialize_run()
 
-    # Load and validate jobs
     jobs_csv_path = Path(jobs_csv)
+    job_dir_path = Path(job_dir)
+
+    # Run pre-submission validation
+    if validate:
+        log.info("Running pre-submission validation...")
+        validator = PreRunValidator()
+        report = validator.validate_all(jobs_csv=jobs_csv_path)
+
+        for error in report.errors:
+            log.error(f"  {error}")
+        for warning in report.warnings:
+            log.warning(f"  {warning}")
+
+        if not report.valid:
+            log.error("Pre-run validation failed. Fix errors before submitting.")
+            raise SystemExit(1)
+
+        log.info(f"Validation passed: {report.checks_passed} checks OK")
+
+    # Load jobs
     if not jobs_csv_path.exists():
         log.error(f"Jobs file not found: {jobs_csv}")
         click.echo(f"Error: {jobs_csv} not found. Run 'rna-map-slurm setup' first.")
@@ -78,22 +112,16 @@ def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
     df = _load_jobs(jobs_csv_path)
     _log_job_summary(df)
 
-    # Validate job scripts exist
-    missing = _validate_job_scripts(df)
-    if missing:
-        log.error(f"Missing {len(missing)} job scripts")
-        for path in missing[:5]:
-            log.error(f"  - {path}")
-        if len(missing) > 5:
-            log.error(f"  ... and {len(missing) - 5} more")
-        raise SystemExit(1)
-
     if dry_run:
-        _print_dry_run_summary(df)
+        _print_dry_run_summary(df, use_arrays)
         return
 
-    # Submit all jobs
-    result = _submit_all_jobs(df)
+    # Submit jobs
+    if use_arrays:
+        result = _submit_as_arrays(df, job_dir_path, max_concurrent)
+    else:
+        result = _submit_individual_jobs(df)
+
     _log_submit_result(result)
 
     # Save submitted job IDs for reference
@@ -110,10 +138,10 @@ def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
     # Verify job outputs if requested
     if verify:
         click.echo("\nVerifying job outputs...")
-        report = _verify_jobs(Path(job_dir), jobs_csv_path)
-        _log_verification_result(report)
+        check_report = _verify_jobs(job_dir_path, jobs_csv_path)
+        _log_verification_result(check_report)
 
-        if report.failure_count > 0 or report.missing_count > 0:
+        if check_report.failure_count > 0 or check_report.missing_count > 0:
             has_errors = True
 
     if has_errors:
@@ -132,14 +160,7 @@ def _initialize_run() -> None:
 
 
 def _load_jobs(jobs_csv: Path) -> pd.DataFrame:
-    """Load jobs DataFrame.
-
-    Args:
-        jobs_csv: Path to jobs.csv file.
-
-    Returns:
-        DataFrame with job information.
-    """
+    """Load jobs DataFrame."""
     df = pd.read_csv(jobs_csv)
     log.info(f"Loaded {len(df)} jobs from {jobs_csv}")
     return df
@@ -155,47 +176,35 @@ def _log_job_summary(df: pd.DataFrame) -> None:
         log.info(f"  {job_type}: {count} jobs")
 
 
-def _validate_job_scripts(df: pd.DataFrame) -> list[str]:
-    """Validate that all job scripts exist.
-
-    Args:
-        df: DataFrame with job_path column.
-
-    Returns:
-        List of missing job script paths.
-    """
-    missing = []
-    for job_path in df["job_path"]:
-        if not Path(job_path).exists():
-            missing.append(job_path)
-    return missing
-
-
-def _print_dry_run_summary(df: pd.DataFrame) -> None:
+def _print_dry_run_summary(df: pd.DataFrame, use_arrays: bool) -> None:
     """Print what would be submitted in dry-run mode."""
-    click.echo("\n=== DRY RUN - No jobs will be submitted ===\n")
+    mode = "as SLURM arrays" if use_arrays else "individually"
+    click.echo(f"\n=== DRY RUN - Jobs would be submitted {mode} ===\n")
 
     for job_type in df["job_type"].unique():
         group = df[df["job_type"] == job_type]
-        click.echo(f"{job_type}: {len(group)} jobs")
+        if use_arrays:
+            click.echo(f"{job_type}: {len(group)} jobs (1 array job)")
+        else:
+            click.echo(f"{job_type}: {len(group)} jobs")
+
         for _, row in group.head(3).iterrows():
             click.echo(f"  - {row['job_path']}")
         if len(group) > 3:
             click.echo(f"  ... and {len(group) - 3} more")
         click.echo()
 
-    click.echo(f"Total: {len(df)} jobs would be submitted")
+    if use_arrays:
+        num_arrays = len(df["job_type"].unique())
+        click.echo(f"Total: {len(df)} jobs in {num_arrays} array(s)")
+    else:
+        click.echo(f"Total: {len(df)} individual jobs")
 
 
-def _submit_all_jobs(df: pd.DataFrame) -> SubmitResult:
-    """Submit all jobs to SLURM.
+def _submit_individual_jobs(df: pd.DataFrame) -> SubmitResult:
+    """Submit jobs individually using sbatch."""
+    import time
 
-    Args:
-        df: DataFrame with job_path column.
-
-    Returns:
-        SubmitResult with submission statistics.
-    """
     start = time.time()
     job_ids: list[str] = []
     failed_jobs: list[str] = []
@@ -230,6 +239,44 @@ def _submit_all_jobs(df: pd.DataFrame) -> SubmitResult:
     )
 
 
+def _submit_as_arrays(
+    df: pd.DataFrame,
+    job_dir: Path,
+    max_concurrent: int,
+) -> SubmitResult:
+    """Submit jobs as SLURM arrays."""
+    executor = JobExecutor(max_concurrent=max_concurrent)
+
+    # Build slurm options map (use defaults for now)
+    slurm_options_map: dict[str, SlurmOptions] = {}
+    for job_type in df["job_type"].unique():
+        slurm_options_map[job_type] = SlurmOptions(name=job_type)
+
+    total_result = SubmitResult()
+
+    for job_type, group in df.groupby("job_type"):
+        scripts = [Path(p) for p in group["job_path"]]
+        options = slurm_options_map.get(str(job_type), SlurmOptions(name=str(job_type)))
+
+        type_job_dir = job_dir / str(job_type)
+        type_job_dir.mkdir(parents=True, exist_ok=True)
+
+        result = executor.submit_scripts_as_array(
+            job_type=str(job_type),
+            scripts=scripts,
+            slurm_options=options,
+            job_dir=type_job_dir,
+        )
+
+        total_result.submitted += result.submitted
+        total_result.failed += result.failed
+        total_result.job_ids.extend(result.job_ids)
+        total_result.failed_jobs.extend(result.failed_jobs)
+        total_result.elapsed_seconds += result.elapsed_seconds
+
+    return total_result
+
+
 def _log_submit_result(result: SubmitResult) -> None:
     """Log submission results."""
     log.info(f"Submission complete in {result.elapsed_seconds:.1f}s")
@@ -238,12 +285,7 @@ def _log_submit_result(result: SubmitResult) -> None:
 
 
 def _save_submitted_jobs(result: SubmitResult, output_dir: Path) -> None:
-    """Save submitted job IDs to file for reference.
-
-    Args:
-        result: SubmitResult with job IDs.
-        output_dir: Directory to save the file.
-    """
+    """Save submitted job IDs to file for reference."""
     output_path = output_dir / "submitted_jobs.txt"
     with open(output_path, "w") as f:
         for job_id in result.job_ids:
@@ -252,15 +294,7 @@ def _save_submitted_jobs(result: SubmitResult, output_dir: Path) -> None:
 
 
 def _verify_jobs(job_dir: Path, jobs_csv: Path) -> CheckReport:
-    """Verify job outputs using JobChecker.
-
-    Args:
-        job_dir: Directory containing job output files.
-        jobs_csv: Path to jobs.csv for expected job list.
-
-    Returns:
-        CheckReport with verification results.
-    """
+    """Verify job outputs using JobChecker."""
     checker = JobChecker(
         job_dir=job_dir,
         jobs_csv=jobs_csv if jobs_csv.exists() else None,
