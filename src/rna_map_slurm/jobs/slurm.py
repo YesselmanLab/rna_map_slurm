@@ -130,3 +130,36 @@ def is_job_type_completed(job_type: str, jobs: list[dict[str, Any]]) -> bool:
         True if no matching jobs are currently running.
     """
     return not any(job_type in job.get("Name", "") for job in jobs)
+
+
+def submit_job(job_path: Path | str) -> tuple[bool, str | None]:
+    """Submit a single job to SLURM and return the job ID.
+
+    Args:
+        job_path: Path to the job script.
+
+    Returns:
+        Tuple of (success, job_id). job_id is None if submission failed.
+    """
+    import re
+
+    try:
+        result = subprocess.run(
+            ["sbatch", str(job_path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            # Parse "Submitted batch job 12345"
+            match = re.search(r"Submitted batch job (\d+)", result.stdout)
+            job_id = match.group(1) if match else None
+            return (True, job_id)
+        else:
+            log.error(f"Failed to submit {job_path}: {result.stderr.strip()}")
+            return (False, None)
+    except FileNotFoundError:
+        log.error("sbatch command not found - not running on a SLURM cluster")
+        return (False, None)
+    except Exception as e:
+        log.error(f"Error submitting {job_path}: {e}")
+        return (False, None)

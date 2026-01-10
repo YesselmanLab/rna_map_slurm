@@ -4,163 +4,277 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import click
 import pandas as pd
 
-from rna_map_slurm.cli.utils import submit_jobs
-from rna_map_slurm.jobs.slurm import get_current_user, get_user_jobs, is_job_type_completed
+from rna_map_slurm.jobs.checker import CheckReport, JobChecker
+from rna_map_slurm.jobs.slurm import submit_job
 from rna_map_slurm.utils.logging import get_logger, setup_logging
 from rna_map_slurm.utils.timing import time_it
 
 log = get_logger("cli.run")
 
-MAX_CONCURRENT_JOBS = 999
-POLL_INTERVAL_SECONDS = 60
+
+@dataclass
+class SubmitResult:
+    """Result of batch job submission."""
+
+    submitted: int = 0
+    failed: int = 0
+    job_ids: list[str] = field(default_factory=list)
+    failed_jobs: list[str] = field(default_factory=list)
+    elapsed_seconds: float = 0.0
 
 
 @click.command()
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show jobs that would be submitted without actually submitting.",
+)
+@click.option(
+    "--verify",
+    is_flag=True,
+    help="Check job outputs for errors after submission.",
+)
+@click.option(
+    "--job-dir",
+    default="jobs",
+    type=click.Path(exists=False),
+    help="Directory containing job scripts and outputs.",
+)
+@click.option(
+    "--jobs-csv",
+    default="jobs.csv",
+    type=click.Path(exists=False),
+    help="Path to jobs.csv file listing jobs to submit.",
+)
 @time_it
-def run() -> None:
-    """Run the SLURM workflow, submitting and monitoring jobs."""
+def run(dry_run: bool, verify: bool, job_dir: str, jobs_csv: str) -> None:
+    """Submit SLURM jobs and optionally verify completion.
+
+    Submits all jobs defined in jobs.csv to the SLURM scheduler.
+    Unlike a polling approach, this submits all jobs immediately
+    and returns.
+
+    \b
+    Examples:
+        rna-map-slurm run                    # Submit all jobs
+        rna-map-slurm run --dry-run          # Show what would be submitted
+        rna-map-slurm run --verify           # Submit and check outputs
+    """
     _initialize_run()
-    df = _load_jobs()
 
-    completed_types: list[str] = []
-    submitted_types = _submit_initial_jobs(df)
+    # Load and validate jobs
+    jobs_csv_path = Path(jobs_csv)
+    if not jobs_csv_path.exists():
+        log.error(f"Jobs file not found: {jobs_csv}")
+        click.echo(f"Error: {jobs_csv} not found. Run 'rna-map-slurm setup' first.")
+        raise SystemExit(1)
 
-    _run_job_loop(df, submitted_types, completed_types)
-    log.info("All jobs are completed")
+    df = _load_jobs(jobs_csv_path)
+    _log_job_summary(df)
+
+    # Validate job scripts exist
+    missing = _validate_job_scripts(df)
+    if missing:
+        log.error(f"Missing {len(missing)} job scripts")
+        for path in missing[:5]:
+            log.error(f"  - {path}")
+        if len(missing) > 5:
+            log.error(f"  ... and {len(missing) - 5} more")
+        raise SystemExit(1)
+
+    if dry_run:
+        _print_dry_run_summary(df)
+        return
+
+    # Submit all jobs
+    result = _submit_all_jobs(df)
+    _log_submit_result(result)
+
+    # Save submitted job IDs for reference
+    if result.job_ids:
+        _save_submitted_jobs(result, jobs_csv_path.parent)
+
+    if result.failed > 0:
+        log.warning(f"{result.failed} jobs failed to submit")
+
+    # Verify job outputs if requested
+    if verify:
+        click.echo("\nVerifying job outputs...")
+        report = _verify_jobs(Path(job_dir), jobs_csv_path)
+        _log_verification_result(report)
+
+        if report.failure_count > 0:
+            raise SystemExit(1)
+
+    log.info("Done")
 
 
 def _initialize_run() -> None:
     """Initialize run logging."""
+    os.makedirs("logs", exist_ok=True)
     if os.path.isfile("logs/run.log"):
         os.remove("logs/run.log")
     setup_logging(file_name="logs/run.log")
 
 
-def _load_jobs() -> pd.DataFrame:
-    """Load jobs DataFrame and initialize status column."""
-    df = pd.read_csv("jobs.csv")
-    df["status"] = "not_started"
+def _load_jobs(jobs_csv: Path) -> pd.DataFrame:
+    """Load jobs DataFrame.
+
+    Args:
+        jobs_csv: Path to jobs.csv file.
+
+    Returns:
+        DataFrame with job information.
+    """
+    df = pd.read_csv(jobs_csv)
+    log.info(f"Loaded {len(df)} jobs from {jobs_csv}")
     return df
 
 
-def _submit_initial_jobs(df: pd.DataFrame) -> list[str]:
-    """Submit jobs with no requirements and return their types."""
-    df_can_run = df[df["job_requirement"].isna()]
-    df.loc[df["job_requirement"].isna(), "status"] = "run"
-    submit_jobs(df_can_run)
-    return df_can_run["job_type"].tolist()
+def _log_job_summary(df: pd.DataFrame) -> None:
+    """Log summary of jobs to submit."""
+    job_types = df["job_type"].unique().tolist()
+    log.info(f"Job types: {job_types}")
+
+    for job_type in job_types:
+        count = len(df[df["job_type"] == job_type])
+        log.info(f"  {job_type}: {count} jobs")
 
 
-def _run_job_loop(
-    df: pd.DataFrame,
-    submitted_types: list[str],
-    completed_types: list[str],
-) -> None:
-    """Main job monitoring and submission loop."""
-    user = get_current_user()
+def _validate_job_scripts(df: pd.DataFrame) -> list[str]:
+    """Validate that all job scripts exist.
 
-    while True:
-        time.sleep(POLL_INTERVAL_SECONDS)
-
-        jobs = get_user_jobs(user)
-        _log_job_status(jobs, submitted_types, completed_types)
-
-        _update_completed_types(submitted_types, completed_types, jobs)
-        df_not_run = _get_pending_jobs(df, completed_types)
-
-        if df_not_run.empty:
-            log.info("All jobs are submitted")
-            break
-
-        _submit_pending_jobs(df, df_not_run, completed_types, submitted_types, jobs)
-
-
-def _log_job_status(
-    jobs: list[dict[str, Any]],
-    submitted_types: list[str],
-    completed_types: list[str],
-) -> None:
-    """Log current job status."""
-    log.info(f"num_jobs: {len(jobs)}")
-    log.info(f"submitted_types: {submitted_types}")
-    log.info(f"completed_types: {completed_types}")
-
-
-def _update_completed_types(
-    submitted_types: list[str],
-    completed_types: list[str],
-    jobs: list[dict[str, Any]],
-) -> None:
-    """Update list of completed job types."""
-    newly_completed = [
-        job_type
-        for job_type in submitted_types
-        if is_job_type_completed(job_type, jobs)
-    ]
-
-    for job_type in newly_completed:
-        log.info(f"Job type {job_type} is completed")
-        completed_types.append(job_type)
-        submitted_types.remove(job_type)
-
-
-def _get_pending_jobs(df: pd.DataFrame, completed_types: list[str]) -> pd.DataFrame:
-    """Get jobs that haven't been run yet and aren't completed."""
-    return df[
-        (~df["job_type"].isin(completed_types)) & (df["status"] == "not_started")
-    ]
-
-
-def _submit_pending_jobs(
-    df: pd.DataFrame,
-    df_not_run: pd.DataFrame,
-    completed_types: list[str],
-    submitted_types: list[str],
-    jobs: list[dict[str, Any]],
-) -> None:
-    """Submit pending jobs whose requirements are met."""
-    for job_type, group in df_not_run.groupby("job_type"):
-        requirement = group["job_requirement"].iloc[0]
-        if requirement not in completed_types:
-            continue
-
-        count = _submit_job_batch(df, group, jobs, submitted_types, str(job_type))
-        if count > 0:
-            log.info(f"Submitted {count} jobs for {job_type}")
-            break
-
-
-def _submit_job_batch(
-    df: pd.DataFrame,
-    group: pd.DataFrame,
-    jobs: list[dict[str, Any]],
-    submitted_types: list[str],
-    job_type: str,
-) -> int:
-    """Submit a batch of jobs up to the max limit.
+    Args:
+        df: DataFrame with job_path column.
 
     Returns:
-        Number of jobs submitted.
+        List of missing job script paths.
     """
-    job_num = len(jobs)
-    count = 0
+    missing = []
+    for job_path in df["job_path"]:
+        if not Path(job_path).exists():
+            missing.append(job_path)
+    return missing
 
-    if job_type not in submitted_types:
-        submitted_types.append(job_type)
 
-    log.info(f"Submitting jobs for {job_type}")
+def _print_dry_run_summary(df: pd.DataFrame) -> None:
+    """Print what would be submitted in dry-run mode."""
+    click.echo("\n=== DRY RUN - No jobs will be submitted ===\n")
 
-    for idx, row in group.iterrows():
-        if job_num >= MAX_CONCURRENT_JOBS:
-            break
-        os.system(f"sbatch {row['job_path']}")
-        df.loc[idx, "status"] = "run"  # type: ignore[index]
-        job_num += 1
-        count += 1
+    for job_type in df["job_type"].unique():
+        group = df[df["job_type"] == job_type]
+        click.echo(f"{job_type}: {len(group)} jobs")
+        for _, row in group.head(3).iterrows():
+            click.echo(f"  - {row['job_path']}")
+        if len(group) > 3:
+            click.echo(f"  ... and {len(group) - 3} more")
+        click.echo()
 
-    return count
+    click.echo(f"Total: {len(df)} jobs would be submitted")
+
+
+def _submit_all_jobs(df: pd.DataFrame) -> SubmitResult:
+    """Submit all jobs to SLURM.
+
+    Args:
+        df: DataFrame with job_path column.
+
+    Returns:
+        SubmitResult with submission statistics.
+    """
+    start = time.time()
+    job_ids: list[str] = []
+    failed_jobs: list[str] = []
+
+    total = len(df)
+    submitted_count = 0
+
+    for job_type, group in df.groupby("job_type"):
+        log.info(f"Submitting {len(group)} jobs for: {job_type}")
+
+        for _, row in group.iterrows():
+            job_path = row["job_path"]
+            success, job_id = submit_job(job_path)
+
+            if success:
+                job_ids.append(job_id or "unknown")
+                submitted_count += 1
+                if submitted_count % 50 == 0:
+                    log.info(f"  Progress: {submitted_count}/{total} submitted")
+            else:
+                failed_jobs.append(job_path)
+                log.warning(f"  Failed: {job_path}")
+
+    elapsed = time.time() - start
+
+    return SubmitResult(
+        submitted=len(job_ids),
+        failed=len(failed_jobs),
+        job_ids=job_ids,
+        failed_jobs=failed_jobs,
+        elapsed_seconds=elapsed,
+    )
+
+
+def _log_submit_result(result: SubmitResult) -> None:
+    """Log submission results."""
+    log.info(f"Submission complete in {result.elapsed_seconds:.1f}s")
+    log.info(f"  Submitted: {result.submitted}")
+    log.info(f"  Failed:    {result.failed}")
+
+
+def _save_submitted_jobs(result: SubmitResult, output_dir: Path) -> None:
+    """Save submitted job IDs to file for reference.
+
+    Args:
+        result: SubmitResult with job IDs.
+        output_dir: Directory to save the file.
+    """
+    output_path = output_dir / "submitted_jobs.txt"
+    with open(output_path, "w") as f:
+        for job_id in result.job_ids:
+            f.write(f"{job_id}\n")
+    log.info(f"Saved {len(result.job_ids)} job IDs to {output_path}")
+
+
+def _verify_jobs(job_dir: Path, jobs_csv: Path) -> CheckReport:
+    """Verify job outputs using JobChecker.
+
+    Args:
+        job_dir: Directory containing job output files.
+        jobs_csv: Path to jobs.csv for expected job list.
+
+    Returns:
+        CheckReport with verification results.
+    """
+    checker = JobChecker(
+        job_dir=job_dir,
+        jobs_csv=jobs_csv if jobs_csv.exists() else None,
+    )
+    return checker.check_all()
+
+
+def _log_verification_result(report: CheckReport) -> None:
+    """Log verification results."""
+    log.info("Job verification complete:")
+    log.info(f"  Succeeded: {report.success_count}/{report.total}")
+    log.info(f"  Failed:    {report.failure_count}")
+    log.info(f"  Missing:   {report.missing_count}")
+
+    if report.failed:
+        log.error("Failed jobs:")
+        for job in report.failed:
+            log.error(f"  {job.job_name}: {job.reason}")
+
+    if report.missing:
+        log.warning("Missing output files:")
+        for job in report.missing[:5]:
+            log.warning(f"  {job.job_name}")
+        if len(report.missing) > 5:
+            log.warning(f"  ... and {len(report.missing) - 5} more")
