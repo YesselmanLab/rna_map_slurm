@@ -92,6 +92,18 @@ class JobChecker:
         ),
     }
 
+    # Error patterns for stderr files (Python exceptions, etc.)
+    STDERR_ERROR_PATTERNS: dict[str, tuple[str, str]] = {
+        r"^Traceback \(most recent call last\):": (
+            "python_exception",
+            "Python exception occurred",
+        ),
+        r"^Error:|^ERROR:": (
+            "error_message",
+            "Error message in stderr",
+        ),
+    }
+
     # Suggestions for fixing different error types
     FIX_SUGGESTIONS: dict[str, str] = {
         "time_limit": (
@@ -103,6 +115,8 @@ class JobChecker:
         "node_failure": "This is a cluster issue - resubmit the failed jobs",
         "segfault": "Check input data for corruption or report bug to developers",
         "exit_error": "Check the job output for specific error messages",
+        "python_exception": "Check the .err file for the full traceback",
+        "error_message": "Check the .err file for error details",
     }
 
     def __init__(
@@ -139,7 +153,7 @@ class JobChecker:
         return job_names
 
     def _find_output_files(self) -> dict[str, Path]:
-        """Find all .out files in the job directory.
+        """Find all .out files in the job directory and its subdirectories.
 
         Returns:
             Dict mapping job name to output file path
@@ -149,7 +163,8 @@ class JobChecker:
         if not self.job_dir.exists():
             return output_files
 
-        for out_file in self.job_dir.glob("*.out"):
+        # Search recursively for .out files in subdirectories
+        for out_file in self.job_dir.glob("**/*.out"):
             job_name = out_file.stem
             output_files[job_name] = out_file
 
@@ -183,6 +198,32 @@ class JobChecker:
 
         return True, None, None
 
+    def _parse_stderr_file(self, path: Path) -> tuple[bool, str | None, str | None]:
+        """Scan a stderr file for error patterns.
+
+        Args:
+            path: Path to the job stderr file (.err)
+
+        Returns:
+            Tuple of (success, error_type, matching_line)
+        """
+        if not path.exists():
+            return True, None, None  # No stderr file is OK
+
+        try:
+            with open(path, "r", errors="replace") as f:
+                lines = f.readlines()
+        except OSError:
+            return True, None, None  # Can't read is OK for stderr
+
+        # Check all lines for error patterns
+        for line in lines:
+            for pattern, (error_type, _) in self.STDERR_ERROR_PATTERNS.items():
+                if re.search(pattern, line, re.MULTILINE):
+                    return False, error_type, line.strip()
+
+        return True, None, None
+
     def _check_single_job(
         self, job_name: str, output_file: Path | None
     ) -> JobStatus:
@@ -203,28 +244,51 @@ class JobChecker:
                 output_file=None,
             )
 
+        # Check stdout file for SLURM errors
         success, error_type, error_line = self._parse_output_file(output_file)
 
-        if success:
+        if not success:
+            # Get human-readable description for the error
+            reason = error_type
+            for pattern, (etype, description) in self.SLURM_ERROR_PATTERNS.items():
+                if etype == error_type:
+                    reason = description
+                    break
+
             return JobStatus(
                 job_name=job_name,
-                status="success",
+                status="failed",
+                reason=reason,
                 output_file=output_file,
+                error_line=error_line,
             )
 
-        # Get human-readable description for the error
-        reason = error_type
-        for pattern, (etype, description) in self.SLURM_ERROR_PATTERNS.items():
-            if etype == error_type:
-                reason = description
-                break
+        # Check stderr file for Python exceptions and other errors
+        stderr_file = output_file.with_suffix(".err")
+        stderr_success, stderr_error_type, stderr_error_line = self._parse_stderr_file(
+            stderr_file
+        )
+
+        if not stderr_success:
+            # Get human-readable description for stderr error
+            reason = stderr_error_type
+            for pattern, (etype, description) in self.STDERR_ERROR_PATTERNS.items():
+                if etype == stderr_error_type:
+                    reason = description
+                    break
+
+            return JobStatus(
+                job_name=job_name,
+                status="failed",
+                reason=reason,
+                output_file=output_file,
+                error_line=stderr_error_line,
+            )
 
         return JobStatus(
             job_name=job_name,
-            status="failed",
-            reason=reason,
+            status="success",
             output_file=output_file,
-            error_line=error_line,
         )
 
     def check_all(self) -> CheckReport:
@@ -277,12 +341,15 @@ class JobChecker:
         suggestions: list[str] = []
         error_types_seen: dict[str, list[str]] = {}
 
+        # Combine all error patterns for lookup
+        all_patterns = {**self.SLURM_ERROR_PATTERNS, **self.STDERR_ERROR_PATTERNS}
+
         # Group failures by error type
         for job in report.failed:
             if job.reason:
                 # Find the error type for this reason
                 error_type = None
-                for pattern, (etype, description) in self.SLURM_ERROR_PATTERNS.items():
+                for pattern, (etype, description) in all_patterns.items():
                     if description == job.reason:
                         error_type = etype
                         break
