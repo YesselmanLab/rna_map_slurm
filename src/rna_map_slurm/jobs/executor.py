@@ -92,7 +92,7 @@ class JobExecutor:
         self,
         log_folder: str = "logs/submitit",
         max_array_size: int = 1000,
-        max_concurrent: int = 50,
+        max_concurrent: int = 1000,
     ) -> None:
         """Initialize the job executor.
 
@@ -367,7 +367,7 @@ def submit_jobs_as_arrays(
     df: pd.DataFrame,
     slurm_options_map: dict[str, SlurmOptions],
     job_dir: Path = Path("jobs"),
-    max_concurrent: int = 50,
+    max_concurrent: int = 1000,
 ) -> SubmitResult:
     """Submit all jobs from a DataFrame as SLURM arrays.
 

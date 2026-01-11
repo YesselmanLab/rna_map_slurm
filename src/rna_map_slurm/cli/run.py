@@ -42,7 +42,7 @@ log = get_logger("cli.run")
 )
 @click.option(
     "--max-concurrent",
-    default=50,
+    default=1000,
     type=int,
     help="Maximum concurrent array tasks (only with --use-arrays).",
 )
