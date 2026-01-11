@@ -373,7 +373,14 @@ def _submit_as_arrays(
     job_dir: Path,
     max_concurrent: int,
 ) -> SubmitResult:
-    """Submit jobs as SLURM arrays."""
+    """Submit jobs as SLURM arrays with dependencies.
+
+    Arrays are submitted in dependency order. Each array job depends on
+    all array jobs from the previous job type completing.
+    """
+    import time
+
+    start = time.time()
     executor = JobExecutor(max_concurrent=max_concurrent)
 
     # Build slurm options map (use defaults for now)
@@ -381,27 +388,51 @@ def _submit_as_arrays(
     for job_type in df["job_type"].unique():
         slurm_options_map[job_type] = SlurmOptions(name=job_type)
 
+    # Track job IDs by job type for dependency resolution
+    job_ids_by_type: dict[str, list[str]] = {}
+
+    # Get submission order based on dependencies
+    submission_order = _get_submission_order(df)
+    log.info(f"Array submission order: {submission_order}")
+
     total_result = SubmitResult()
 
-    for job_type, group in df.groupby("job_type"):
+    for job_type in submission_order:
+        group = df[df["job_type"] == job_type]
         scripts = [Path(p) for p in group["job_path"]]
-        options = slurm_options_map.get(str(job_type), SlurmOptions(name=str(job_type)))
+        options = slurm_options_map.get(job_type, SlurmOptions(name=job_type))
 
-        type_job_dir = job_dir / str(job_type)
+        type_job_dir = job_dir / job_type
         type_job_dir.mkdir(parents=True, exist_ok=True)
 
+        # Get dependency job IDs
+        dependency_ids = _get_dependency_job_ids(df, job_type, job_ids_by_type)
+
+        if dependency_ids:
+            log.info(
+                f"Submitting array for {job_type}: {len(scripts)} jobs "
+                f"(depends on {len(dependency_ids)} prior array jobs)"
+            )
+        else:
+            log.info(f"Submitting array for {job_type}: {len(scripts)} jobs (no dependencies)")
+
         result = executor.submit_scripts_as_array(
-            job_type=str(job_type),
+            job_type=job_type,
             scripts=scripts,
             slurm_options=options,
             job_dir=type_job_dir,
+            dependency_job_ids=dependency_ids,
         )
+
+        # Track job IDs for this type (for downstream dependencies)
+        job_ids_by_type[job_type] = result.job_ids
 
         total_result.submitted += result.submitted
         total_result.failed += result.failed
         total_result.job_ids.extend(result.job_ids)
         total_result.failed_jobs.extend(result.failed_jobs)
-        total_result.elapsed_seconds += result.elapsed_seconds
+
+    total_result.elapsed_seconds = time.time() - start
 
     return total_result
 

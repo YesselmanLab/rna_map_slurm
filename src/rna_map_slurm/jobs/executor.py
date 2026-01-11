@@ -179,6 +179,7 @@ class JobExecutor:
         scripts: list[Path],
         slurm_options: SlurmOptions,
         job_dir: Path,
+        dependency_job_ids: list[str] | None = None,
     ) -> SubmitResult:
         """Submit shell scripts as a SLURM job array.
 
@@ -189,6 +190,7 @@ class JobExecutor:
             scripts: List of shell script paths.
             slurm_options: SLURM configuration.
             job_dir: Directory for job files.
+            dependency_job_ids: Optional list of job IDs that must complete first.
 
         Returns:
             SubmitResult with submission statistics.
@@ -234,8 +236,10 @@ class JobExecutor:
                 with open(array_script, "w") as f:
                     f.write(script_content)
 
-                # Submit the array job
-                success, job_id = self._submit_array_script(array_script)
+                # Submit the array job with dependencies
+                success, job_id = self._submit_array_script(
+                    array_script, dependency_job_ids
+                )
 
                 if success:
                     job_ids.append(job_id or "unknown")
@@ -311,11 +315,16 @@ exit $EXIT_CODE
 """
         return script
 
-    def _submit_array_script(self, script_path: Path) -> tuple[bool, str | None]:
+    def _submit_array_script(
+        self,
+        script_path: Path,
+        dependency_job_ids: list[str] | None = None,
+    ) -> tuple[bool, str | None]:
         """Submit an array job script using sbatch.
 
         Args:
             script_path: Path to the array job script.
+            dependency_job_ids: Optional list of job IDs that must complete first.
 
         Returns:
             Tuple of (success, job_id).
@@ -323,8 +332,17 @@ exit $EXIT_CODE
         import re
 
         try:
+            cmd = ["sbatch"]
+
+            # Add dependency if specified
+            if dependency_job_ids:
+                dep_str = ":".join(dependency_job_ids)
+                cmd.extend(["--dependency", f"afterok:{dep_str}"])
+
+            cmd.append(str(script_path))
+
             result = subprocess.run(
-                ["sbatch", str(script_path)],
+                cmd,
                 capture_output=True,
                 text=True,
             )
