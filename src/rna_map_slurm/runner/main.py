@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import click
 
-from rna_map_slurm.runner.fastq_ops import demultiplex, join_fastq_files, split_fastqs
+from rna_map_slurm.runner.fastq_ops import (
+    demultiplex,
+    join_fastq_files,
+    split_fastq,
+    split_fastqs,
+)
 from rna_map_slurm.runner.int_demultiplex_ops import (
     int_demultiplex,
     int_demultiplex_rna_map,
@@ -19,6 +24,7 @@ def cli() -> None:
     pass
 
 
+cli.add_command(split_fastq)
 cli.add_command(split_fastqs)
 cli.add_command(demultiplex)
 cli.add_command(join_fastq_files)

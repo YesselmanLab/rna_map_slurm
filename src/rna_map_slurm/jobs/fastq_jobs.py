@@ -27,6 +27,8 @@ def generate_split_fastq_jobs(
 ) -> pd.DataFrame:
     """Generate SLURM jobs for splitting FASTQ files.
 
+    Creates one job per individual FASTQ file (separate jobs for R1 and R2).
+
     Args:
         pfqs: List of paired FASTQ files.
         params: Workflow parameters.
@@ -40,41 +42,58 @@ def generate_split_fastq_jobs(
     slurm_params = params["slurm_options"][job_name]
     extra_cmds = params["slurm_options"].get("extra-header-cmds", "")
     cur_dir = os.path.abspath(os.getcwd())
+    data_dir = os.path.join(cur_dir, "data")
     job_names: list[str] = []
 
-    for i, pfq in enumerate(pfqs):
-        name = f"{job_name}-{i:04}"
-        header = create_job_header(name, slurm_params, extra_cmds, job_dir)
-        body = _build_split_job_body(pfq, cur_dir, params, i)
-        write_job_file(job_dir, name, header + body)
-        job_names.append(name)
+    job_index = 0
+    for pair_index, pfq in enumerate(pfqs):
+        start = pair_index * params["fastq_chunks"]
+
+        # Create job for R1
+        name_r1 = f"{job_name}-{job_index:04}"
+        header_r1 = create_job_header(name_r1, slurm_params, extra_cmds, job_dir)
+        body_r1 = _build_split_single_fastq_body(
+            pfq.read_1.path, data_dir, params["fastq_chunks"], start
+        )
+        write_job_file(job_dir, name_r1, header_r1 + body_r1)
+        job_names.append(name_r1)
+        job_index += 1
+
+        # Create job for R2
+        name_r2 = f"{job_name}-{job_index:04}"
+        header_r2 = create_job_header(name_r2, slurm_params, extra_cmds, job_dir)
+        body_r2 = _build_split_single_fastq_body(
+            pfq.read_2.path, data_dir, params["fastq_chunks"], start
+        )
+        write_job_file(job_dir, name_r2, header_r2 + body_r2)
+        job_names.append(name_r2)
+        job_index += 1
 
     df_jobs = generate_job_list(job_dir, job_name, "", job_names)
     generate_submit_file(f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist())
     return df_jobs
 
 
-def _build_split_job_body(
-    pfq: PairedFastqFiles,
-    cur_dir: str,
-    params: dict[str, Any],
-    index: int,
+def _build_split_single_fastq_body(
+    fastq_path: str,
+    data_dir: str,
+    num_chunks: int,
+    start: int,
 ) -> str:
-    """Build the body of a split FASTQ job script.
+    """Build the body of a split FASTQ job script for a single file.
 
     Args:
-        pfq: Paired FASTQ files to split.
-        cur_dir: Current working directory.
-        params: Workflow parameters.
-        index: Index of this FASTQ pair.
+        fastq_path: Path to the FASTQ file to split.
+        data_dir: Directory for output data.
+        num_chunks: Number of chunks to split into.
+        start: Starting index for chunk numbering.
 
     Returns:
         Job body as string.
     """
-    start = index * params["fastq_chunks"]
     return (
-        f"rna-map-slurm-runner split-fastqs {pfq.read_1.path} {pfq.read_2.path} "
-        f"{os.path.join(cur_dir, 'data')} {params['fastq_chunks']} --start {start}\n"
+        f"rna-map-slurm-runner split-fastq {fastq_path} "
+        f"{data_dir} {num_chunks} --start {start}\n"
     )
 
 

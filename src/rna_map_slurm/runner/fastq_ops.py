@@ -17,6 +17,41 @@ from rna_map_slurm.utils.timing import time_it
 log = get_logger("runner.fastq")
 
 
+@click.command("split-fastq")
+@time_it
+@click.argument("fastq_path", type=click.Path(exists=True), required=True)
+@click.argument("output_dir", type=click.Path(exists=True), required=True)
+@click.argument("num_chunks", type=int, required=True)
+@click.option(
+    "--start",
+    default=0,
+    show_default=True,
+    help="Starting index for chunk numbering.",
+)
+@click.option(
+    "--threads",
+    default=1,
+    show_default=True,
+    help="Number of threads for splitting.",
+)
+def split_fastq(
+    fastq_path: str,
+    output_dir: str,
+    num_chunks: int,
+    start: int,
+    threads: int,
+) -> None:
+    """Split a single FASTQ file into multiple chunks.
+
+    Arguments:
+        fastq_path: Path to FASTQ file.
+        output_dir: Directory for output files.
+        num_chunks: Number of chunks to create.
+    """
+    setup_logging()
+    split_fastq_file(fastq_path, output_dir, num_chunks, start, threads)
+
+
 @click.command("split-fastqs")
 @time_it
 @click.argument("r1_path", type=click.Path(exists=True), required=True)
