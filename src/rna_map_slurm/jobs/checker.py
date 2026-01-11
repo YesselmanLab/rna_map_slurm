@@ -301,9 +301,16 @@ class JobChecker:
         expected_jobs = self._load_expected_jobs()
 
         # If we have a jobs.csv, use it to determine expected jobs
-        # Otherwise, just check whatever output files exist
+        # But if none of the expected jobs have output files, fall back to
+        # checking whatever output files actually exist (handles stale jobs.csv)
         if expected_jobs:
-            all_jobs = expected_jobs
+            # Check if any expected jobs have output files
+            matching = expected_jobs & set(output_files.keys())
+            if matching:
+                all_jobs = expected_jobs
+            else:
+                # No matches - jobs.csv is probably stale, use output files
+                all_jobs = set(output_files.keys())
         else:
             all_jobs = set(output_files.keys())
 
