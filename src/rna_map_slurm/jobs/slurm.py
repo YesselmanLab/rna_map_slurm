@@ -132,11 +132,16 @@ def is_job_type_completed(job_type: str, jobs: list[dict[str, Any]]) -> bool:
     return not any(job_type in job.get("Name", "") for job in jobs)
 
 
-def submit_job(job_path: Path | str) -> tuple[bool, str | None]:
+def submit_job(
+    job_path: Path | str,
+    dependency_job_ids: list[str] | None = None,
+) -> tuple[bool, str | None]:
     """Submit a single job to SLURM and return the job ID.
 
     Args:
         job_path: Path to the job script.
+        dependency_job_ids: Optional list of job IDs that must complete first.
+            Uses SLURM's --dependency=afterok:id1:id2:... feature.
 
     Returns:
         Tuple of (success, job_id). job_id is None if submission failed.
@@ -144,8 +149,17 @@ def submit_job(job_path: Path | str) -> tuple[bool, str | None]:
     import re
 
     try:
+        cmd = ["sbatch"]
+
+        # Add dependency if specified
+        if dependency_job_ids:
+            dep_str = ":".join(dependency_job_ids)
+            cmd.extend(["--dependency", f"afterok:{dep_str}"])
+
+        cmd.append(str(job_path))
+
         result = subprocess.run(
-            ["sbatch", str(job_path)],
+            cmd,
             capture_output=True,
             text=True,
         )

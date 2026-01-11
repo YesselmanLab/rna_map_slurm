@@ -178,15 +178,27 @@ def _log_job_summary(df: pd.DataFrame) -> None:
 
 def _print_dry_run_summary(df: pd.DataFrame, use_arrays: bool) -> None:
     """Print what would be submitted in dry-run mode."""
-    mode = "as SLURM arrays" if use_arrays else "individually"
+    mode = "as SLURM arrays" if use_arrays else "individually with SLURM dependencies"
     click.echo(f"\n=== DRY RUN - Jobs would be submitted {mode} ===\n")
 
-    for job_type in df["job_type"].unique():
+    # Get submission order
+    submission_order = _get_submission_order(df)
+    click.echo(f"Submission order: {' -> '.join(submission_order)}\n")
+
+    for job_type in submission_order:
         group = df[df["job_type"] == job_type]
+
+        # Get dependency info
+        dep_info = ""
+        if "job_requirement" in df.columns:
+            req = group["job_requirement"].iloc[0]
+            if pd.notna(req) and req:
+                dep_info = f" (waits for {req})"
+
         if use_arrays:
-            click.echo(f"{job_type}: {len(group)} jobs (1 array job)")
+            click.echo(f"{job_type}: {len(group)} jobs (1 array job){dep_info}")
         else:
-            click.echo(f"{job_type}: {len(group)} jobs")
+            click.echo(f"{job_type}: {len(group)} jobs{dep_info}")
 
         for _, row in group.head(3).iterrows():
             click.echo(f"  - {row['job_path']}")
@@ -202,25 +214,52 @@ def _print_dry_run_summary(df: pd.DataFrame, use_arrays: bool) -> None:
 
 
 def _submit_individual_jobs(df: pd.DataFrame) -> SubmitResult:
-    """Submit jobs individually using sbatch."""
+    """Submit jobs individually using sbatch with SLURM dependencies.
+
+    Jobs are submitted in dependency order. Jobs with no requirements are
+    submitted first, then jobs that depend on completed job types are
+    submitted with --dependency=afterok:jobid1:jobid2:...
+    """
     import time
 
     start = time.time()
-    job_ids: list[str] = []
+    all_job_ids: list[str] = []
     failed_jobs: list[str] = []
 
     total = len(df)
     submitted_count = 0
 
-    for job_type, group in df.groupby("job_type"):
-        log.info(f"Submitting {len(group)} jobs for: {job_type}")
+    # Track job IDs by job type for dependency resolution
+    job_ids_by_type: dict[str, list[str]] = {}
+
+    # Get submission order based on dependencies
+    submission_order = _get_submission_order(df)
+    log.info(f"Submission order: {submission_order}")
+
+    for job_type in submission_order:
+        group = df[df["job_type"] == job_type]
+
+        # Get dependency job IDs if this job type has requirements
+        dependency_ids = _get_dependency_job_ids(df, job_type, job_ids_by_type)
+
+        if dependency_ids:
+            log.info(
+                f"Submitting {len(group)} jobs for: {job_type} "
+                f"(depends on {len(dependency_ids)} prior jobs)"
+            )
+        else:
+            log.info(f"Submitting {len(group)} jobs for: {job_type} (no dependencies)")
+
+        job_ids_by_type[job_type] = []
 
         for _, row in group.iterrows():
             job_path = row["job_path"]
-            success, job_id = submit_job(job_path)
+            success, job_id = submit_job(job_path, dependency_ids)
 
             if success:
-                job_ids.append(job_id or "unknown")
+                all_job_ids.append(job_id or "unknown")
+                if job_id:
+                    job_ids_by_type[job_type].append(job_id)
                 submitted_count += 1
                 if submitted_count % 50 == 0:
                     log.info(f"  Progress: {submitted_count}/{total} submitted")
@@ -231,12 +270,102 @@ def _submit_individual_jobs(df: pd.DataFrame) -> SubmitResult:
     elapsed = time.time() - start
 
     return SubmitResult(
-        submitted=len(job_ids),
+        submitted=len(all_job_ids),
         failed=len(failed_jobs),
-        job_ids=job_ids,
+        job_ids=all_job_ids,
         failed_jobs=failed_jobs,
         elapsed_seconds=elapsed,
     )
+
+
+def _get_submission_order(df: pd.DataFrame) -> list[str]:
+    """Determine job submission order based on dependencies.
+
+    Uses topological sort to ensure jobs are submitted after their dependencies.
+
+    Args:
+        df: DataFrame with job_type and job_requirement columns.
+
+    Returns:
+        List of job types in submission order.
+    """
+    job_types = df["job_type"].unique().tolist()
+
+    # Build dependency graph
+    # dependencies[job_type] = set of job types it depends on
+    dependencies: dict[str, set[str]] = {jt: set() for jt in job_types}
+
+    if "job_requirement" in df.columns:
+        for job_type in job_types:
+            group = df[df["job_type"] == job_type]
+            req = group["job_requirement"].iloc[0]
+            if pd.notna(req) and req:
+                dependencies[job_type].add(str(req))
+
+    # Topological sort using Kahn's algorithm
+    # Count incoming edges (dependencies)
+    in_degree = {jt: len(deps) for jt, deps in dependencies.items()}
+
+    # Start with job types that have no dependencies
+    queue = [jt for jt, degree in in_degree.items() if degree == 0]
+    result = []
+
+    while queue:
+        # Sort queue for deterministic order
+        queue.sort()
+        current = queue.pop(0)
+        result.append(current)
+
+        # Reduce in-degree for job types that depend on current
+        for jt, deps in dependencies.items():
+            if current in deps:
+                in_degree[jt] -= 1
+                if in_degree[jt] == 0:
+                    queue.append(jt)
+
+    # Check for cycles
+    if len(result) != len(job_types):
+        log.warning("Circular dependency detected, falling back to original order")
+        return job_types
+
+    return result
+
+
+def _get_dependency_job_ids(
+    df: pd.DataFrame,
+    job_type: str,
+    job_ids_by_type: dict[str, list[str]],
+) -> list[str] | None:
+    """Get job IDs that a job type depends on.
+
+    Args:
+        df: DataFrame with job_requirement column.
+        job_type: The job type to get dependencies for.
+        job_ids_by_type: Mapping of job type to submitted job IDs.
+
+    Returns:
+        List of job IDs to depend on, or None if no dependencies.
+    """
+    if "job_requirement" not in df.columns:
+        return None
+
+    group = df[df["job_type"] == job_type]
+    req = group["job_requirement"].iloc[0]
+
+    if pd.isna(req) or not req:
+        return None
+
+    req_type = str(req)
+    if req_type not in job_ids_by_type:
+        log.warning(f"Dependency {req_type} not found for {job_type}")
+        return None
+
+    dep_ids = job_ids_by_type[req_type]
+    if not dep_ids:
+        log.warning(f"No job IDs for dependency {req_type}")
+        return None
+
+    return dep_ids
 
 
 def _submit_as_arrays(
