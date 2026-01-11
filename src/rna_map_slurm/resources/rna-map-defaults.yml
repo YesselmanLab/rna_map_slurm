@@ -1,5 +1,6 @@
 # RNA-Map Default Parameters
 # These are the default parameters for rna-map when run via rna-map-slurm
+# These match the 'barcoded-library' preset from rna_map.parameters.get_preset_params()
 # Users can override these by specifying a custom params file with --params-file
 
 # abbreviations
@@ -10,7 +11,7 @@
 # arguments related to mapping step
 overwrite: False
 restore_org_behavior: False
-stricter_bv_constraints: False
+stricter_bv_constraints: True
 map:
   skip: False
   skip_fastqc: False
@@ -25,13 +26,13 @@ bit_vector:
   skip: False
   qscore_cutoff: 25
   num_of_surbases: 10
-  map_score_cutoff: 15
-  plot_sequence: False
+  map_score_cutoff: 25
+  plot_sequence: True
   summary_output_only: False
   json_format: False # output bitvectors in JSON format instead of text format
-  stricter_constraints: # new cutoffs for bit vectors use at your own risk
+  stricter_constraints: # cutoffs for stricter bit vector filtering
       min_mut_distance: 5 # minimum distance between mutations
-      percent_length_cutoff: 0.10 #
+      percent_length_cutoff: 0.5
       mutation_count_cutoff: 5
 # dirs locations ##############################################################
 dirs:
