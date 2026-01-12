@@ -90,8 +90,17 @@ def get_pop_avg_summary() -> pd.DataFrame:
 
     Returns:
         Combined DataFrame from all mutation histogram files.
+        Empty DataFrame if no files found.
     """
     dfs = find_mutation_histos_files(".")
+
+    if not dfs:
+        log.warning("No mutation_histos.json files found")
+        log.warning(
+            "Expected path: results/*/processed/*/output/BitVector_Files/mutation_histos.json"
+        )
+        return pd.DataFrame()
+
     df = pd.concat(dfs, ignore_index=True)
 
     total_reads = df["num_reads"].sum()

@@ -46,6 +46,10 @@ def _save_pop_avg_summaries() -> None:
     """Save population average summaries for each run."""
     df_summary = get_pop_avg_summary()
 
+    if df_summary.empty:
+        click.echo("No population average data to summarize (rna-map results not found)")
+        return
+
     for run_name, group in df_summary.groupby("run_name"):
         group.to_json(
             f"results/{run_name}/summary/summary.json",
