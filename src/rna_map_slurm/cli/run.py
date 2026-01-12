@@ -12,6 +12,7 @@ from rna_map_slurm.jobs.checker import CheckReport, JobChecker
 from rna_map_slurm.jobs.executor import JobExecutor, SubmitResult
 from rna_map_slurm.jobs.pre_validator import PreRunValidator
 from rna_map_slurm.jobs.slurm import submit_job
+from rna_map_slurm.jobs.watcher import JobWatcher, WatcherConfig, WatcherStatus
 from rna_map_slurm.models.config import SlurmOptions
 from rna_map_slurm.utils.logging import get_logger, setup_logging
 from rna_map_slurm.utils.timing import time_it
@@ -58,6 +59,17 @@ log = get_logger("cli.run")
     type=click.Path(exists=False),
     help="Path to jobs.csv file listing jobs to submit.",
 )
+@click.option(
+    "--watch",
+    is_flag=True,
+    help="Watch jobs until completion after submission.",
+)
+@click.option(
+    "--poll-interval",
+    default=60,
+    type=int,
+    help="Seconds between status checks when watching (default: 60).",
+)
 @time_it
 def run(
     dry_run: bool,
@@ -67,6 +79,8 @@ def run(
     max_concurrent: int,
     job_dir: str,
     jobs_csv: str,
+    watch: bool,
+    poll_interval: int,
 ) -> None:
     """Submit SLURM jobs and optionally verify completion.
 
@@ -80,6 +94,7 @@ def run(
         rna-map-slurm run --use-arrays       # Submit as job arrays (faster)
         rna-map-slurm run --verify           # Submit and check outputs
         rna-map-slurm run --no-validate      # Skip pre-run validation
+        rna-map-slurm run --watch            # Submit and watch until done
     """
     _initialize_run()
 
@@ -134,6 +149,17 @@ def run(
     if result.failed > 0:
         log.error(f"{result.failed} jobs failed to submit")
         has_errors = True
+
+    # Watch jobs if requested
+    if watch:
+        click.echo("\nWatching jobs until completion...")
+        watch_status = _watch_jobs(job_dir_path, poll_interval)
+        if watch_status.has_failures:
+            log.error(
+                f"{watch_status.total_failed + watch_status.total_dependency_failed} "
+                "jobs failed"
+            )
+            has_errors = True
 
     # Verify job outputs if requested
     if verify:
@@ -451,6 +477,20 @@ def _save_submitted_jobs(result: SubmitResult, output_dir: Path) -> None:
         for job_id in result.job_ids:
             f.write(f"{job_id}\n")
     log.info(f"Saved {len(result.job_ids)} job IDs to {output_path}")
+
+
+def _watch_jobs(job_dir: Path, poll_interval: int) -> WatcherStatus:
+    """Watch jobs until completion."""
+    config = WatcherConfig(
+        poll_interval_seconds=poll_interval,
+        job_dir=job_dir,
+    )
+    watcher = JobWatcher(config)
+
+    def _log_status(status: WatcherStatus) -> None:
+        log.info(status.to_summary_line())
+
+    return watcher.watch_until_complete(callback=_log_status)
 
 
 def _verify_jobs(job_dir: Path, jobs_csv: Path) -> CheckReport:

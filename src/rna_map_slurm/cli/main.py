@@ -12,6 +12,7 @@ from rna_map_slurm.cli.run import run
 from rna_map_slurm.cli.setup_cmd import get_data_csv, setup
 from rna_map_slurm.cli.summaries import generate_summaries
 from rna_map_slurm.cli.summary_cmd import summary
+from rna_map_slurm.cli.watch import watch
 from rna_map_slurm.cli.zip_cmd import zip_demultiplex_subset
 
 
@@ -31,6 +32,7 @@ cli.add_command(deposit_results)
 cli.add_command(clean)
 cli.add_command(zip_demultiplex_subset)
 cli.add_command(generate_example_config)
+cli.add_command(watch)
 
 
 if __name__ == "__main__":

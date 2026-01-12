@@ -90,6 +90,10 @@ class JobChecker:
             "exit_error",
             "Job exited with non-zero exit code",
         ),
+        r"DependencyNeverSatisfied|CANCELLED.*Dependency": (
+            "dependency_failed",
+            "Job cancelled due to dependency failure",
+        ),
     }
 
     # Error patterns for stderr files (Python exceptions, etc.)
@@ -117,6 +121,7 @@ class JobChecker:
         "exit_error": "Check the job output for specific error messages",
         "python_exception": "Check the .err file for the full traceback",
         "error_message": "Check the .err file for error details",
+        "dependency_failed": "A prerequisite job failed - fix the upstream job and resubmit",
     }
 
     def __init__(
