@@ -251,6 +251,6 @@ def generate_int_demultiplex_rna_map_combine_jobs(
         write_job_file(job_dir, name, header + body)
         job_names.append(name)
 
-    df_jobs = generate_job_list(job_dir, job_name, "int-demultiplexed-rna-map", job_names)
+    df_jobs = generate_job_list(job_dir, job_name, "int-demultiplex-rna-map", job_names)
     generate_submit_file(f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist())
     return df_jobs
