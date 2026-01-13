@@ -263,9 +263,10 @@ def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
     """Query sacct for job timing data.
 
     Supports both regular job IDs and array job IDs (format: JOBID_TASKID).
+    Also handles the case where submitted_jobs.txt contains array base IDs.
 
     Args:
-        job_ids: List of SLURM job IDs.
+        job_ids: List of SLURM job IDs (may be base IDs for arrays).
 
     Returns:
         List of JobTimingRecord objects.
@@ -273,36 +274,41 @@ def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
     records = []
     job_set = set(job_ids)
 
-    # Separate array jobs from regular jobs
-    array_base_ids = set()
-    regular_ids = set()
+    # Build set of base/regular IDs for querying sacct
+    # IDs with "_" are array tasks - extract the base ID
+    # IDs without "_" could be regular jobs OR array base IDs
+    base_or_regular_ids = set()
+
     for jid in job_ids:
         if "_" in jid:
-            # Array job: extract base ID (e.g., "12345_0" -> "12345")
-            array_base_ids.add(jid.split("_")[0])
+            base_or_regular_ids.add(jid.split("_")[0])
         else:
-            regular_ids.add(jid)
+            base_or_regular_ids.add(jid)
 
-    # Build comma-separated job list for sacct
-    # For arrays, we query the base ID which returns all tasks
-    all_query_ids = list(regular_ids | array_base_ids)
+    # For sacct query, we use base/regular IDs
+    # sacct will return all array tasks for base IDs
+    all_query_ids = list(base_or_regular_ids)
 
     # Query in batches to avoid command line length limits
     batch_size = 100
     for i in range(0, len(all_query_ids), batch_size):
         batch = all_query_ids[i : i + batch_size]
-        batch_records = _query_sacct_batch(batch, job_set)
+        # Pass both exact IDs and base IDs for matching
+        batch_records = _query_sacct_batch(batch, job_set, base_or_regular_ids)
         records.extend(batch_records)
 
     return records
 
 
-def _parse_sacct_line(line: str, valid_ids: set[str]) -> JobTimingRecord | None:
+def _parse_sacct_line(
+    line: str, valid_ids: set[str], valid_base_ids: set[str]
+) -> JobTimingRecord | None:
     """Parse a single sacct output line into a JobTimingRecord.
 
     Args:
         line: Pipe-separated sacct output line.
-        valid_ids: Set of valid job IDs to filter results.
+        valid_ids: Set of valid job IDs (exact match).
+        valid_base_ids: Set of valid base IDs for array jobs.
 
     Returns:
         JobTimingRecord or None if line should be skipped.
@@ -317,8 +323,18 @@ def _parse_sacct_line(line: str, valid_ids: set[str]) -> JobTimingRecord | None:
     if "." in job_id:
         return None
 
-    # Only include jobs from our submission
-    if job_id not in valid_ids:
+    # Check if this job is valid
+    # For array jobs (e.g., "12345_0"), check if base ID is in valid_base_ids
+    # For regular jobs, check exact match in valid_ids
+    is_valid = False
+    if job_id in valid_ids:
+        is_valid = True
+    elif "_" in job_id:
+        base_id = job_id.split("_")[0]
+        if base_id in valid_base_ids:
+            is_valid = True
+
+    if not is_valid:
         return None
 
     return JobTimingRecord(
@@ -334,13 +350,14 @@ def _parse_sacct_line(line: str, valid_ids: set[str]) -> JobTimingRecord | None:
 
 
 def _query_sacct_batch(
-    query_ids: list[str], valid_ids: set[str]
+    query_ids: list[str], valid_ids: set[str], valid_base_ids: set[str]
 ) -> list[JobTimingRecord]:
     """Query sacct for a batch of job IDs.
 
     Args:
         query_ids: Job IDs to query.
-        valid_ids: Set of valid job IDs to filter results.
+        valid_ids: Set of valid job IDs (exact match).
+        valid_base_ids: Set of valid base IDs for array jobs.
 
     Returns:
         List of JobTimingRecord objects.
@@ -366,7 +383,7 @@ def _query_sacct_batch(
         for line in result.stdout.strip().split("\n"):
             if not line:
                 continue
-            record = _parse_sacct_line(line, valid_ids)
+            record = _parse_sacct_line(line, valid_ids, valid_base_ids)
             if record:
                 records.append(record)
         return records
