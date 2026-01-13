@@ -88,7 +88,7 @@ class PipelineSummary:
         return (self.total_succeeded / self.total_jobs) * 100
 
     def to_table(self) -> str:
-        """Generate a formatted table of the summary."""
+        """Generate a markdown formatted table of the summary."""
         headers = ["Job Type", "Total", "Succeeded", "Failed", "Missing", "Success %"]
         rows = []
 
@@ -104,7 +104,7 @@ class PipelineSummary:
 
         # Add totals row
         rows.append([
-            "TOTAL",
+            "**TOTAL**",
             self.total_jobs,
             self.total_succeeded,
             self.total_failed,
@@ -112,7 +112,7 @@ class PipelineSummary:
             f"{self.overall_success_rate:.1f}%",
         ])
 
-        return tabulate(rows, headers=headers, tablefmt="simple")
+        return tabulate(rows, headers=headers, tablefmt="github")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

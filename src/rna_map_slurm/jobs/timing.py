@@ -104,26 +104,28 @@ class TimingReport:
         return self.speedup_factor
 
     def to_table(self) -> str:
-        """Format report as human-readable table."""
+        """Format report as markdown."""
         from tabulate import tabulate
 
         lines = []
-        lines.append("Timing Report")
-        lines.append("=" * 70)
+        lines.append("## Timing Report")
         lines.append("")
 
-        # Summary metrics
-        lines.append(f"Wall clock time:     {_format_duration(self.wall_clock_seconds)}")
-        lines.append(
-            f"Total compute time:  {_format_duration(self.total_compute_seconds)}"
-        )
-        lines.append(f"Speedup factor:      {self.speedup_factor:.1f}x")
-        lines.append(f"Peak concurrent:     {self.peak_concurrent} jobs")
-        lines.append(f"Avg concurrency:     {self.avg_concurrency:.1f} jobs")
-        lines.append(f"Total jobs:          {self.total_jobs}")
+        # Summary metrics as markdown table
+        summary_rows = [
+            ["Wall clock time", _format_duration(self.wall_clock_seconds)],
+            ["Total compute time", _format_duration(self.total_compute_seconds)],
+            ["Speedup factor", f"{self.speedup_factor:.1f}x"],
+            ["Peak concurrent", f"{self.peak_concurrent} jobs"],
+            ["Avg concurrency", f"{self.avg_concurrency:.1f} jobs"],
+            ["Total jobs", str(self.total_jobs)],
+        ]
+        lines.append(tabulate(summary_rows, headers=["Metric", "Value"], tablefmt="github"))
         lines.append("")
 
         # Per-job-type table
+        lines.append("### Job Timing by Type")
+        lines.append("")
         headers = ["Job Type", "Count", "Total", "Avg", "Min", "Max", "Done", "Fail"]
         rows = []
 
@@ -144,12 +146,12 @@ class TimingReport:
                 jt.failed,
             ])
 
-        lines.append(tabulate(rows, headers=headers, tablefmt="simple"))
+        lines.append(tabulate(rows, headers=headers, tablefmt="github"))
         lines.append("")
 
         # Queue wait times
-        lines.append("Queue Wait Times")
-        lines.append("-" * 70)
+        lines.append("### Queue Wait Times")
+        lines.append("")
         wait_headers = ["Job Type", "Avg Wait", "Jobs"]
         wait_rows = []
 
@@ -162,7 +164,7 @@ class TimingReport:
                     jt.count,
                 ])
 
-        lines.append(tabulate(wait_rows, headers=wait_headers, tablefmt="simple"))
+        lines.append(tabulate(wait_rows, headers=wait_headers, tablefmt="github"))
 
         return "\n".join(lines)
 

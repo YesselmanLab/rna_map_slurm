@@ -120,7 +120,7 @@ def _format_table_output(
     timing_report,
     validate_outputs: bool,
 ) -> str:
-    """Format the complete summary output as a table.
+    """Format the complete summary output as markdown.
 
     Args:
         pipeline_summary: Job status summary.
@@ -128,24 +128,27 @@ def _format_table_output(
         validate_outputs: Whether output validation was enabled.
 
     Returns:
-        Formatted string output.
+        Formatted markdown string.
     """
     sections = []
 
     # Job status section
-    status_section = "Pipeline Summary\n" + "=" * 70 + "\n\n"
-    status_section += pipeline_summary.to_table()
+    sections.append("## Pipeline Summary")
+    sections.append("")
+    sections.append(pipeline_summary.to_table())
     if validate_outputs:
-        status_section += "\n\n(Output validation enabled)"
-    sections.append(status_section)
+        sections.append("")
+        sections.append("*(Output validation enabled)*")
 
     # Timing section
     if timing_report:
-        sections.append("\n\n" + timing_report.to_table())
+        sections.append("")
+        sections.append(timing_report.to_table())
     else:
+        sections.append("")
         sections.append(
-            "\n\n(Timing data not available - "
-            "run on SLURM cluster with submitted_jobs.txt)"
+            "*(Timing data not available - "
+            "run on SLURM cluster with submitted_jobs.txt)*"
         )
 
-    return "".join(sections)
+    return "\n".join(sections)
