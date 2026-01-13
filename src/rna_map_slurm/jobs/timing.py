@@ -260,6 +260,8 @@ def get_timing_report(submitted_jobs_file: Path) -> TimingReport | None:
 def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
     """Query sacct for job timing data.
 
+    Supports both regular job IDs and array job IDs (format: JOBID_TASKID).
+
     Args:
         job_ids: List of SLURM job IDs.
 
@@ -267,16 +269,84 @@ def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
         List of JobTimingRecord objects.
     """
     records = []
-
-    # Build job ID range for sacct query
-    min_id = min(job_ids)
-    max_id = max(job_ids)
     job_set = set(job_ids)
 
+    # Separate array jobs from regular jobs
+    array_base_ids = set()
+    regular_ids = set()
+    for jid in job_ids:
+        if "_" in jid:
+            # Array job: extract base ID (e.g., "12345_0" -> "12345")
+            array_base_ids.add(jid.split("_")[0])
+        else:
+            regular_ids.add(jid)
+
+    # Build comma-separated job list for sacct
+    # For arrays, we query the base ID which returns all tasks
+    all_query_ids = list(regular_ids | array_base_ids)
+
+    # Query in batches to avoid command line length limits
+    batch_size = 100
+    for i in range(0, len(all_query_ids), batch_size):
+        batch = all_query_ids[i : i + batch_size]
+        batch_records = _query_sacct_batch(batch, job_set)
+        records.extend(batch_records)
+
+    return records
+
+
+def _parse_sacct_line(line: str, valid_ids: set[str]) -> JobTimingRecord | None:
+    """Parse a single sacct output line into a JobTimingRecord.
+
+    Args:
+        line: Pipe-separated sacct output line.
+        valid_ids: Set of valid job IDs to filter results.
+
+    Returns:
+        JobTimingRecord or None if line should be skipped.
+    """
+    parts = line.split("|")
+    if len(parts) < 7:
+        return None
+
+    job_id, job_name, state, elapsed, submit, start, end = parts[:7]
+
+    # Skip batch/extern steps (e.g., "12345.batch", "12345.extern")
+    if "." in job_id:
+        return None
+
+    # Only include jobs from our submission
+    if job_id not in valid_ids:
+        return None
+
+    return JobTimingRecord(
+        job_id=job_id,
+        job_name=job_name,
+        job_type=_extract_job_type(job_name),
+        state=state,
+        elapsed_seconds=_parse_elapsed(elapsed),
+        submit_time=_parse_datetime(submit),
+        start_time=_parse_datetime(start),
+        end_time=_parse_datetime(end),
+    )
+
+
+def _query_sacct_batch(
+    query_ids: list[str], valid_ids: set[str]
+) -> list[JobTimingRecord]:
+    """Query sacct for a batch of job IDs.
+
+    Args:
+        query_ids: Job IDs to query.
+        valid_ids: Set of valid job IDs to filter results.
+
+    Returns:
+        List of JobTimingRecord objects.
+    """
     cmd = [
         "sacct",
         "-j",
-        f"{min_id}-{max_id}",
+        ",".join(query_ids),
         "--format=JobID,JobName%50,State,Elapsed,Submit,Start,End",
         "-P",
         "--noheader",
@@ -284,44 +354,20 @@ def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
 
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
+            cmd, capture_output=True, text=True, timeout=120
         )
         if result.returncode != 0:
             log.warning(f"sacct failed: {result.stderr}")
-            return records
+            return []
 
+        records = []
         for line in result.stdout.strip().split("\n"):
             if not line:
                 continue
-
-            parts = line.split("|")
-            if len(parts) < 7:
-                continue
-
-            job_id, job_name, state, elapsed, submit, start, end = parts[:7]
-
-            # Skip batch/extern steps
-            if "." in job_id:
-                continue
-
-            # Only include jobs from our submission
-            if job_id not in job_set:
-                continue
-
-            record = JobTimingRecord(
-                job_id=job_id,
-                job_name=job_name,
-                job_type=_extract_job_type(job_name),
-                state=state,
-                elapsed_seconds=_parse_elapsed(elapsed),
-                submit_time=_parse_datetime(submit),
-                start_time=_parse_datetime(start),
-                end_time=_parse_datetime(end),
-            )
-            records.append(record)
+            record = _parse_sacct_line(line, valid_ids)
+            if record:
+                records.append(record)
+        return records
 
     except subprocess.TimeoutExpired:
         log.warning("sacct query timed out")
@@ -330,7 +376,7 @@ def _query_sacct(job_ids: list[str]) -> list[JobTimingRecord]:
     except Exception as e:
         log.warning(f"Error querying sacct: {e}")
 
-    return records
+    return []
 
 
 def _build_report(records: list[JobTimingRecord]) -> TimingReport:
