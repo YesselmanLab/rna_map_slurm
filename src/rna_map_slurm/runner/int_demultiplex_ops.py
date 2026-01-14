@@ -13,6 +13,9 @@ from rna_map_slurm.tasks.int_demultiplex import (
 from rna_map_slurm.tasks.int_demultiplex import (
     int_demultiplex_rna_map_combine as task_int_demultiplex_rna_map_combine,
 )
+from rna_map_slurm.tasks.int_demultiplex_cpp import (
+    int_demultiplex_batch_cpp as task_int_demultiplex_batch_cpp,
+)
 from rna_map_slurm.utils.logging import setup_logging
 from rna_map_slurm.utils.timing import time_it
 
@@ -58,6 +61,31 @@ def int_demultiplex(
         b1_max_pos,
         b2_min_pos,
         b2_max_pos,
+    )
+
+
+@click.command("int-demultiplex-cpp")
+@time_it
+@click.argument("lib_barcode")
+@click.argument("barcode_json")
+def int_demultiplex_cpp(lib_barcode: str, barcode_json: str) -> None:
+    """Perform batch internal demultiplexing using C++ (218x faster).
+
+    Processes all internal barcodes in a single pass through the FASTQ files.
+
+    Arguments:
+        lib_barcode: Library barcode sequence.
+        barcode_json: Path to barcode JSON file.
+    """
+    setup_logging()
+    r1_path = f"demultiplexed/{lib_barcode}/test_R1.fastq.gz"
+    r2_path = f"demultiplexed/{lib_barcode}/test_R2.fastq.gz"
+    output_dir = f"int-demultiplexed/{lib_barcode}"
+    task_int_demultiplex_batch_cpp(
+        r1_path=r1_path,
+        r2_path=r2_path,
+        output_dir=output_dir,
+        barcode_json_path=barcode_json,
     )
 
 

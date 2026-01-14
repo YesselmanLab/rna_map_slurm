@@ -12,6 +12,7 @@ from rna_map_slurm.runner.fastq_ops import (
 )
 from rna_map_slurm.runner.int_demultiplex_ops import (
     int_demultiplex,
+    int_demultiplex_cpp,
     int_demultiplex_rna_map,
     int_demultiplex_rna_map_combine,
 )
@@ -31,6 +32,7 @@ cli.add_command(join_fastq_files)
 cli.add_command(run_rna_map)
 cli.add_command(rna_map_combine)
 cli.add_command(int_demultiplex)
+cli.add_command(int_demultiplex_cpp)
 cli.add_command(int_demultiplex_rna_map)
 cli.add_command(int_demultiplex_rna_map_combine)
 

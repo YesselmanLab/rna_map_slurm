@@ -3,6 +3,10 @@
 # Number of chunks to split each FASTQ file into
 fastq_chunks: 100
 
+# Use C++ batch mode for internal demultiplexing (218x faster than seqkit)
+# Requires the C++ extension to be built: pip install -e . --no-build-isolation
+use_cpp_demultiplex: false
+
 # Path configuration
 paths:
   log: "logs"

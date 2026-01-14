@@ -94,6 +94,7 @@ class WorkflowConfig(BaseModel):
         construct_options: Construct handling options.
         tasks_per_job: Mapping of job type to tasks per job.
         slurm_options: Mapping of job type to SLURM options.
+        use_cpp_demultiplex: Use C++ batch mode for internal demultiplexing (218x faster).
     """
 
     fastq_chunks: int = Field(default=100, ge=1)
@@ -102,6 +103,7 @@ class WorkflowConfig(BaseModel):
     construct_options: ConstructOptions = Field(default_factory=ConstructOptions)
     tasks_per_job: dict[str, int] = Field(default_factory=dict)
     slurm_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    use_cpp_demultiplex: bool = Field(default=False)
 
     @field_validator("tasks_per_job")
     @classmethod

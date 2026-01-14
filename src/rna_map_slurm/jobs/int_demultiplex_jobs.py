@@ -33,6 +33,17 @@ def generate_int_demultiplex_jobs(
     Returns:
         DataFrame with job details.
     """
+    use_cpp = params.get("use_cpp_demultiplex", False)
+    if use_cpp:
+        return _generate_int_demultiplex_jobs_cpp(params, df)
+    return _generate_int_demultiplex_jobs_seqkit(params, df)
+
+
+def _generate_int_demultiplex_jobs_seqkit(
+    params: dict[str, Any],
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Generate seqkit-based int-demultiplex jobs (original implementation)."""
     job_name = "int-demultiplex"
     job_dir = ensure_job_directories(job_name)
     os.makedirs("int-demultiplexed", exist_ok=True)
@@ -54,6 +65,42 @@ def generate_int_demultiplex_jobs(
         body = _build_int_demultiplex_job_body(group)
         write_job_file(job_dir, name, header + body)
         job_names.append(name)
+
+    df_jobs = generate_job_list(job_dir, job_name, "join-fastq-files", job_names)
+    generate_submit_file(f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist())
+    return df_jobs
+
+
+def _generate_int_demultiplex_jobs_cpp(
+    params: dict[str, Any],
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Generate C++ batch mode int-demultiplex jobs (218x faster).
+
+    Creates one job per library barcode that processes all internal barcodes
+    in a single pass through the FASTQ files.
+    """
+    job_name = "int-demultiplex"
+    job_dir = ensure_job_directories(job_name)
+    os.makedirs("int-demultiplexed", exist_ok=True)
+
+    slurm_params = params["slurm_options"][job_name]
+    extra_cmds = params["slurm_options"].get("extra-header-cmds", "")
+
+    job_names: list[str] = []
+    for i, row in df.iterrows():
+        lib_barcode = row["barcode_seq"]
+        barcode_json = f"inputs/barcode_jsons/{row['code']}.json"
+
+        os.makedirs(f"int-demultiplexed/{lib_barcode}", exist_ok=True)
+
+        name = f"{job_name}-{i:04}"
+        header = create_job_header(name, slurm_params, extra_cmds, str(job_dir))
+        body = f"rna-map-slurm-runner int-demultiplex-cpp {lib_barcode} {barcode_json}\n"
+        write_job_file(job_dir, name, header + body)
+        job_names.append(name)
+
+    log.info(f"Generated {len(job_names)} C++ batch int-demultiplex jobs")
 
     df_jobs = generate_job_list(job_dir, job_name, "join-fastq-files", job_names)
     generate_submit_file(f"submits/README-{job_name.upper()}", df_jobs["job_path"].tolist())
