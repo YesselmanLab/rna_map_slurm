@@ -7,6 +7,10 @@ fastq_chunks: 100
 # Requires the C++ extension to be built: pip install -e . --no-build-isolation
 use_cpp_demultiplex: false
 
+# Number of barcodes to process per C++ batch job (only used when use_cpp_demultiplex is true)
+# Set lower if you have thousands of barcodes to parallelize across more jobs
+cpp_barcodes_per_job: 200
+
 # Path configuration
 paths:
   log: "logs"

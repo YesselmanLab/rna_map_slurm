@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
@@ -77,8 +78,8 @@ def _generate_int_demultiplex_jobs_cpp(
 ) -> pd.DataFrame:
     """Generate C++ batch mode int-demultiplex jobs (218x faster).
 
-    Creates one job per library barcode that processes all internal barcodes
-    in a single pass through the FASTQ files.
+    Splits barcodes into chunks based on cpp_barcodes_per_job setting.
+    Each job processes a subset of barcodes in a single pass through the FASTQ files.
     """
     job_name = "int-demultiplex"
     job_dir = ensure_job_directories(job_name)
@@ -86,19 +87,48 @@ def _generate_int_demultiplex_jobs_cpp(
 
     slurm_params = params["slurm_options"][job_name]
     extra_cmds = params["slurm_options"].get("extra-header-cmds", "")
+    barcodes_per_job = params.get("cpp_barcodes_per_job", 200)
+
+    # Directory for chunked barcode JSONs
+    chunk_dir = "inputs/barcode_jsons_chunked"
+    os.makedirs(chunk_dir, exist_ok=True)
 
     job_names: list[str] = []
-    for i, row in df.iterrows():
+    job_idx = 0
+
+    for _, row in df.iterrows():
         lib_barcode = row["barcode_seq"]
         barcode_json = f"inputs/barcode_jsons/{row['code']}.json"
 
         os.makedirs(f"int-demultiplexed/{lib_barcode}", exist_ok=True)
 
-        name = f"{job_name}-{i:04}"
-        header = create_job_header(name, slurm_params, extra_cmds, str(job_dir))
-        body = f"rna-map-slurm-runner int-demultiplex-cpp {lib_barcode} {barcode_json}\n"
-        write_job_file(job_dir, name, header + body)
-        job_names.append(name)
+        # Load all barcodes
+        with open(barcode_json) as f:
+            all_barcodes = json.load(f)
+
+        # Split into chunks
+        chunks = [
+            all_barcodes[i : i + barcodes_per_job]
+            for i in range(0, len(all_barcodes), barcodes_per_job)
+        ]
+
+        log.info(
+            f"{lib_barcode}: {len(all_barcodes)} barcodes -> {len(chunks)} jobs "
+            f"({barcodes_per_job} per job)"
+        )
+
+        for chunk_idx, chunk in enumerate(chunks):
+            # Write chunk JSON
+            chunk_file = f"{chunk_dir}/{row['code']}_chunk{chunk_idx:04}.json"
+            with open(chunk_file, "w") as f:
+                json.dump(chunk, f)
+
+            name = f"{job_name}-{job_idx:04}"
+            header = create_job_header(name, slurm_params, extra_cmds, str(job_dir))
+            body = f"rna-map-slurm-runner int-demultiplex-cpp {lib_barcode} {chunk_file}\n"
+            write_job_file(job_dir, name, header + body)
+            job_names.append(name)
+            job_idx += 1
 
     log.info(f"Generated {len(job_names)} C++ batch int-demultiplex jobs")
 

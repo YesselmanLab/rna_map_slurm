@@ -104,6 +104,7 @@ class WorkflowConfig(BaseModel):
     tasks_per_job: dict[str, int] = Field(default_factory=dict)
     slurm_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
     use_cpp_demultiplex: bool = Field(default=False)
+    cpp_barcodes_per_job: int = Field(default=200, ge=1)
 
     @field_validator("tasks_per_job")
     @classmethod
